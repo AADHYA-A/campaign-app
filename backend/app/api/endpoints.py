@@ -1,0 +1,83 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from app.services.llm_service import llm_service
+from app.services.indic_trans import indic_translation
+from app.core.database import get_async_session
+from app.models.campaign import Campaign
+from pydantic import BaseModel
+from typing import List
+from datetime import datetime
+
+router = APIRouter()
+
+class CampaignRequest(BaseModel):
+    topic: str
+    tone: str = "professional"
+    target_lang: str = "eng"
+    
+class CampaignResponse(BaseModel):
+    id: str
+    topic: str
+    original_content: str
+    translated_content: str
+    sentiment: dict
+    target_language: str
+    created_at: datetime
+
+@router.post("/campaign/generate", response_model=CampaignResponse)
+async def generate_campaign(req: CampaignRequest, session: AsyncSession = Depends(get_async_session)):
+    content = await llm_service.generate_campaign_content(topic=req.topic, tone=req.tone)
+    sentiment = await llm_service.analyze_sentiment(content)
+    translated = indic_translation.translate(
+        text=content,
+        source_lang="eng",
+        target_lang=req.target_lang
+    )
+
+    new_campaign = Campaign(
+        topic=req.topic,
+        tone=req.tone,
+        original_content=content,
+        target_language=req.target_lang,
+        translated_content=translated,
+        sentiment_score=sentiment.get("confidence", 0.0),
+        sentiment_label=sentiment.get("sentiment", "unknown")
+    )
+
+    session.add(new_campaign)
+    await session.commit()
+
+    # Re-fetch after commit instead of refresh() — avoids async session pool issue on Windows
+    campaign_id = new_campaign.id
+    result = await session.execute(select(Campaign).where(Campaign.id == campaign_id))
+    saved = result.scalar_one()
+
+    return CampaignResponse(
+        id=saved.id,
+        topic=saved.topic,
+        original_content=saved.original_content,
+        translated_content=saved.translated_content or "",
+        sentiment={"sentiment": saved.sentiment_label, "confidence": saved.sentiment_score},
+        target_language=saved.target_language or "",
+        created_at=saved.created_at
+    )
+
+@router.get("/campaigns/history", response_model=List[CampaignResponse])
+async def get_campaign_history(session: AsyncSession = Depends(get_async_session)):
+    result = await session.execute(
+        select(Campaign).order_by(Campaign.created_at.desc())
+    )
+    campaigns = result.scalars().all()
+    
+    return [
+        CampaignResponse(
+            id=c.id,
+            topic=c.topic,
+            original_content=c.original_content,
+            translated_content=c.translated_content or "",
+            sentiment={"sentiment": c.sentiment_label, "confidence": c.sentiment_score},
+            target_language=c.target_language or "",
+            created_at=c.created_at
+        ) for c in campaigns
+    ]
