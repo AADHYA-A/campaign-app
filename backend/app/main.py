@@ -19,14 +19,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(api_router, prefix="/api")
+app.include_router(api_router, prefix="/api/backend")
 
 @app.on_event("startup")
 async def on_startup():
     """Verify database connectivity on application start."""
-    async with engine.begin() as conn:
-        # Creates tables if they don't exist yet (useful for dev without Alembic)
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            # Creates tables if they don't exist yet (useful for dev without Alembic)
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        print(f"Warning: Could not connect to database on startup. Ensure DATABASE_URL is set correctly. Error: {e}")
 
 @app.get("/")
 async def root():
