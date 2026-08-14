@@ -21,4 +21,16 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+import os
+
 settings = Settings()
+
+# Automatically configure databases for Vercel's built-in Postgres and KV Add-ons
+if os.getenv("POSTGRES_URL"):
+    # Convert Vercel's postgres:// URL to the drivers required by the backend
+    raw_url = os.getenv("POSTGRES_URL")
+    settings.DATABASE_URL = raw_url.replace("postgres://", "postgresql+asyncpg://")
+    settings.SYNC_DATABASE_URL = raw_url.replace("postgres://", "postgresql+psycopg2://")
+
+if os.getenv("KV_URL"):
+    settings.REDIS_URL = os.getenv("KV_URL")
