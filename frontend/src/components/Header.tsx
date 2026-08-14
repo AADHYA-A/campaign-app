@@ -22,10 +22,10 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-const navLinks = [
+const authNavLinks = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -43,8 +43,8 @@ function AvatarBadge({ name, email }: { name?: string | null; email: string }) {
   return (
     <div
       style={{
-        width: 34,
-        height: 34,
+        width: 36,
+        height: 36,
         borderRadius: "50%",
         background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
         display: "flex",
@@ -52,7 +52,7 @@ function AvatarBadge({ name, email }: { name?: string | null; email: string }) {
         justifyContent: "center",
         color: "#fff",
         fontWeight: 800,
-        fontSize: "0.8rem",
+        fontSize: "0.82rem",
         letterSpacing: "-0.03em",
         boxShadow: "0 4px 12px rgba(79,70,229,0.35)",
         userSelect: "none",
@@ -164,47 +164,67 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* Desktop Nav */}
-          <nav
-            style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
-            className="desktop-nav"
-          >
-            {navLinks.map(({ href, label, icon: Icon }) => {
-              const isActive = pathname === href;
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`nav-link${isActive ? " active" : ""}`}
-                >
-                  <Icon size={15} />
-                  {label}
-                </Link>
-              );
-            })}
-            {isAdmin && (
+          {/* Desktop Nav (When Authenticated) */}
+          {isAuthenticated && (
+            <nav
+              style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
+              className="desktop-nav"
+            >
+              {authNavLinks.map(({ href, label, icon: Icon }) => {
+                const isActive = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`nav-link${isActive ? " active" : ""}`}
+                  >
+                    <Icon size={15} />
+                    {label}
+                  </Link>
+                );
+              })}
               <Link
                 href="/admin"
                 className={`nav-link${pathname === "/admin" ? " active" : ""}`}
-                style={{ color: "#d97706" }}
+                style={{
+                  color: isAdmin ? "#d97706" : "inherit",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                }}
               >
-                <Shield size={15} />
+                <Shield size={15} color={isAdmin ? "#d97706" : undefined} />
                 Admin
+                {isAdmin && (
+                  <span
+                    style={{
+                      fontSize: "0.65rem",
+                      padding: "0.1rem 0.4rem",
+                      borderRadius: 999,
+                      background: "rgba(217,119,6,0.15)",
+                      color: "#d97706",
+                      fontWeight: 700,
+                    }}
+                  >
+                    PRO
+                  </span>
+                )}
               </Link>
-            )}
-          </nav>
+            </nav>
+          )}
 
           {/* Right Actions */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
-            {/* Campaign CTA */}
-            <Link
-              href="/dashboard"
-              className="btn btn-primary"
-              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
-            >
-              <Zap size={15} />
-              New Campaign
-            </Link>
+            {isAuthenticated && (
+              <Link
+                href="/dashboard"
+                className="btn btn-primary"
+                style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+              >
+                <Zap size={15} />
+                New Campaign
+              </Link>
+            )}
 
             {/* Auth area */}
             {!isLoading && (
@@ -356,23 +376,40 @@ export default function Header() {
                     )}
                   </div>
                 ) : (
-                  /* ── Unauthenticated: Login + Register buttons ── */
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }} className="desktop-nav">
+                  /* ── Unauthenticated: Admin Login, Sign In & Sign Up / Register buttons ── */
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }} className="desktop-nav">
+                    <Link
+                      href="/login?role=admin"
+                      className={`btn ${pathname === "/login" && typeof window !== "undefined" && window.location.search.includes("admin") ? "btn-secondary" : "btn-ghost"}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.4rem",
+                        fontSize: "0.85rem",
+                        padding: "0.5rem 0.85rem",
+                        color: "#d97706",
+                        border: "1px solid rgba(217,119,6,0.25)",
+                        background: "rgba(217,119,6,0.06)",
+                      }}
+                    >
+                      <Shield size={14} color="#d97706" />
+                      Admin Login
+                    </Link>
                     <Link
                       href="/login"
-                      className="btn btn-ghost"
-                      style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem" }}
+                      className={`btn ${pathname === "/login" ? "btn-secondary" : "btn-ghost"}`}
+                      style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem", padding: "0.5rem 0.85rem" }}
                     >
                       <LogIn size={15} />
-                      Sign in
+                      Sign In
                     </Link>
                     <Link
                       href="/register"
-                      className="btn btn-secondary"
-                      style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem" }}
+                      className={`btn ${pathname === "/register" || pathname === "/signup" ? "btn-primary" : "btn-secondary"}`}
+                      style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem", padding: "0.5rem 0.85rem" }}
                     >
                       <UserPlus size={15} />
-                      Register
+                      Sign Up / Register
                     </Link>
                   </div>
                 )}
@@ -418,30 +455,49 @@ export default function Header() {
               gap: "0.25rem",
             }}
           >
-            {navLinks.map(({ href, label, icon: Icon }) => {
-              const isActive = pathname === href;
-              return (
+            {isAuthenticated ? (
+              <>
+                {authNavLinks.map(({ href, label, icon: Icon }) => {
+                  const isActive = pathname === href;
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`nav-link${isActive ? " active" : ""}`}
+                      style={{ padding: "0.75rem 1rem", fontSize: "0.95rem" }}
+                    >
+                      <Icon size={18} />
+                      {label}
+                    </Link>
+                  );
+                })}
                 <Link
-                  key={href}
-                  href={href}
+                  href="/admin"
                   onClick={() => setMobileOpen(false)}
-                  className={`nav-link${isActive ? " active" : ""}`}
-                  style={{ padding: "0.75rem 1rem", fontSize: "0.95rem" }}
+                  className={`nav-link${pathname === "/admin" ? " active" : ""}`}
+                  style={{
+                    padding: "0.75rem 1rem",
+                    fontSize: "0.95rem",
+                    color: isAdmin ? "#d97706" : "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                  }}
                 >
-                  <Icon size={18} />
-                  {label}
+                  <Shield size={18} color={isAdmin ? "#d97706" : undefined} />
+                  Admin Panel {isAdmin && "(PRO)"}
                 </Link>
-              );
-            })}
-            {isAdmin && (
+              </>
+            ) : (
               <Link
-                href="/admin"
+                href="/"
                 onClick={() => setMobileOpen(false)}
-                className={`nav-link${pathname === "/admin" ? " active" : ""}`}
-                style={{ padding: "0.75rem 1rem", fontSize: "0.95rem", color: "#d97706" }}
+                className={`nav-link${pathname === "/" ? " active" : ""}`}
+                style={{ padding: "0.75rem 1rem", fontSize: "0.95rem" }}
               >
-                <Shield size={18} />
-                Admin Panel
+                <Home size={18} />
+                Home
               </Link>
             )}
 
@@ -450,6 +506,15 @@ export default function Header() {
               <div style={{ borderTop: "1px solid var(--border)", marginTop: "0.5rem", paddingTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 {isAuthenticated ? (
                   <>
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setMobileOpen(false)}
+                      className="btn btn-primary"
+                      style={{ justifyContent: "center", gap: "0.5rem" }}
+                    >
+                      <Zap size={17} />
+                      New Campaign
+                    </Link>
                     <Link
                       href="/profile"
                       onClick={() => setMobileOpen(false)}
@@ -471,22 +536,37 @@ export default function Header() {
                 ) : (
                   <>
                     <Link
+                      href="/login?role=admin"
+                      onClick={() => setMobileOpen(false)}
+                      className="btn btn-ghost"
+                      style={{
+                        justifyContent: "center",
+                        gap: "0.5rem",
+                        color: "#d97706",
+                        border: "1px solid rgba(217,119,6,0.25)",
+                        background: "rgba(217,119,6,0.06)",
+                      }}
+                    >
+                      <Shield size={17} color="#d97706" />
+                      Admin Login
+                    </Link>
+                    <Link
                       href="/login"
                       onClick={() => setMobileOpen(false)}
-                      className="btn btn-secondary"
-                      style={{ justifyContent: "center" }}
+                      className={`btn ${pathname === "/login" ? "btn-primary" : "btn-secondary"}`}
+                      style={{ justifyContent: "center", gap: "0.5rem" }}
                     >
                       <LogIn size={17} />
-                      Sign in
+                      Sign In
                     </Link>
                     <Link
                       href="/register"
                       onClick={() => setMobileOpen(false)}
-                      className="btn btn-primary"
-                      style={{ justifyContent: "center" }}
+                      className={`btn ${pathname === "/register" || pathname === "/signup" ? "btn-secondary" : "btn-primary"}`}
+                      style={{ justifyContent: "center", gap: "0.5rem" }}
                     >
                       <UserPlus size={17} />
-                      Create account
+                      Sign Up / Register
                     </Link>
                   </>
                 )}

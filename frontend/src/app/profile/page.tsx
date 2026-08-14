@@ -255,7 +255,6 @@ export default function ProfilePage() {
                   gap: "0.3rem",
                   marginTop: "0.5rem",
                   fontSize: "0.8rem",
-                  color: "#64748b",
                   background: "var(--primary-light)",
                   color: "var(--primary)",
                   padding: "0.2rem 0.65rem",
