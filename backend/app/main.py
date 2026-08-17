@@ -7,6 +7,7 @@ from app.models.base import Base
 # Import models so Base.metadata knows about them
 import app.models.user  # noqa: F401
 import app.models.campaign  # noqa: F401
+import app.models.distribution  # noqa: F401
 
 app = FastAPI(
     title="Multilingual Campaign Management API",

@@ -8,13 +8,17 @@ from sqlalchemy.future import select
 from app.services.llm_service import llm_service
 from app.services.indic_trans import indic_translation
 from app.services.content_service import content_service
+from app.services.distribution_service import distribution_service
+from app.services.analytics_engine import analytics_engine
+from app.services.feedback_service import feedback_service
 from app.core.database import get_async_session
 from app.core.users import optional_current_user, current_active_user
 from app.models.campaign import Campaign
+from app.models.distribution import DistributionJob, DeliveryLog, AudienceFeedback
 from app.models.user import User
 from app.schemas.user import UserRead, UserUpdate
-from pydantic import BaseModel
-from typing import List, Optional, Any
+from pydantic import BaseModel, Field
+from typing import List, Optional, Any, Dict
 from datetime import datetime
 
 router = APIRouter()
@@ -417,3 +421,307 @@ async def admin_delete_user(
         raise HTTPException(status_code=404, detail="User not found.")
     await session.delete(user)
     await session.commit()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Milestone 3: Multi-Channel Distribution & Engagement Analytics Platform
+# ─────────────────────────────────────────────────────────────────────────────
+
+class LaunchDistributionRequest(BaseModel):
+    title: str
+    content: str
+    channels: List[str] = Field(default=["email", "sms", "whatsapp"])
+    language: str = "hin"
+    schedule_type: str = "immediate"  # immediate, scheduled, recurring
+    scheduled_at: Optional[datetime] = None
+    recurring_frequency: str = "none"  # none, daily, weekly, monthly
+    audience_size: int = 250
+    campaign_id: Optional[str] = None
+
+
+class FeedbackSubmitRequest(BaseModel):
+    recipient_name: str = "Audience Member"
+    channel: str = "email"
+    language: str = "hin"
+    feedback_text: str
+
+
+@router.post(
+    "/distribution/launch",
+    tags=["milestone3", "distribution"],
+    summary="Launch or Schedule a Multi-Channel Campaign Distribution",
+)
+async def launch_distribution_job(
+    req: LaunchDistributionRequest,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: Optional[User] = Depends(optional_current_user),
+):
+    """
+    Milestone 3:
+    1. Select Channels (Email, SMS, WhatsApp, Push Notification, Web Broadcast)
+    2. Schedule Campaign (Immediate, Scheduled at Date/Time, Recurring)
+    3. Automated Distribution (Dispatch through selected channels)
+    4. Real-time Delivery Tracking (Sent, Delivered, Failed, Pending, Retrying)
+    """
+    job = await distribution_service.launch_distribution(
+        session=session,
+        title=req.title,
+        content=req.content,
+        channels=req.channels,
+        language=req.language,
+        schedule_type=req.schedule_type,
+        scheduled_at=req.scheduled_at,
+        recurring_frequency=req.recurring_frequency,
+        audience_size=req.audience_size,
+        campaign_id=req.campaign_id,
+        user_id=str(current_user.id) if current_user else None,
+    )
+
+    return {
+        "id": job.id,
+        "title": job.title,
+        "content": job.content,
+        "channels": job.channels,
+        "language": job.language,
+        "schedule_type": job.schedule_type,
+        "scheduled_at": job.scheduled_at.isoformat() if job.scheduled_at else None,
+        "recurring_frequency": job.recurring_frequency,
+        "status": job.status,
+        "total_recipients": job.total_recipients,
+        "sent_count": job.sent_count,
+        "delivered_count": job.delivered_count,
+        "failed_count": job.failed_count,
+        "retrying_count": job.retrying_count,
+        "pending_count": job.pending_count,
+        "open_count": job.open_count,
+        "click_count": job.click_count,
+        "response_count": job.response_count,
+        "channel_metrics": job.channel_metrics,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+    }
+
+
+@router.get(
+    "/distribution/list",
+    tags=["milestone3", "distribution"],
+    summary="List all Campaign Distribution Jobs",
+)
+async def list_distribution_jobs(
+    session: AsyncSession = Depends(get_async_session),
+    current_user: Optional[User] = Depends(optional_current_user),
+):
+    """Return all past and active distribution jobs."""
+    query = select(DistributionJob).order_by(DistributionJob.created_at.desc())
+    if current_user:
+        query = query.where(
+            (DistributionJob.user_id == str(current_user.id)) | (DistributionJob.user_id == None)  # noqa: E711
+        )
+    result = await session.execute(query)
+    jobs = result.scalars().all()
+
+    return [
+        {
+            "id": j.id,
+            "title": j.title,
+            "content": j.content,
+            "channels": j.channels,
+            "language": j.language,
+            "schedule_type": j.schedule_type,
+            "scheduled_at": j.scheduled_at.isoformat() if j.scheduled_at else None,
+            "recurring_frequency": j.recurring_frequency,
+            "status": j.status,
+            "total_recipients": j.total_recipients,
+            "sent_count": j.sent_count,
+            "delivered_count": j.delivered_count,
+            "failed_count": j.failed_count,
+            "retrying_count": j.retrying_count,
+            "pending_count": j.pending_count,
+            "open_count": j.open_count,
+            "click_count": j.click_count,
+            "response_count": j.response_count,
+            "channel_metrics": j.channel_metrics,
+            "created_at": j.created_at.isoformat() if j.created_at else None,
+        }
+        for j in jobs
+    ]
+
+
+@router.get(
+    "/distribution/{job_id}",
+    tags=["milestone3", "distribution"],
+    summary="Get Distribution Job Details & Metrics",
+)
+async def get_distribution_job(
+    job_id: str,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Retrieve details, delivery counters, and channel metrics for a single job."""
+    result = await session.execute(select(DistributionJob).where(DistributionJob.id == job_id))
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Distribution job not found.")
+
+    return {
+        "id": job.id,
+        "title": job.title,
+        "content": job.content,
+        "channels": job.channels,
+        "language": job.language,
+        "schedule_type": job.schedule_type,
+        "scheduled_at": job.scheduled_at.isoformat() if job.scheduled_at else None,
+        "recurring_frequency": job.recurring_frequency,
+        "status": job.status,
+        "total_recipients": job.total_recipients,
+        "sent_count": job.sent_count,
+        "delivered_count": job.delivered_count,
+        "failed_count": job.failed_count,
+        "retrying_count": job.retrying_count,
+        "pending_count": job.pending_count,
+        "open_count": job.open_count,
+        "click_count": job.click_count,
+        "response_count": job.response_count,
+        "channel_metrics": job.channel_metrics,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+    }
+
+
+@router.get(
+    "/distribution/{job_id}/logs",
+    tags=["milestone3", "distribution"],
+    summary="Get Real-Time Delivery Logs for a Job",
+)
+async def get_delivery_logs(
+    job_id: str,
+    channel: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    search: Optional[str] = None,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Milestone 3 Step 4: Real-time status tracking for every message.
+    Filter by channel, delivery status (sent, delivered, failed, pending, retrying), or recipient search.
+    """
+    query = select(DeliveryLog).where(DeliveryLog.distribution_id == job_id).order_by(DeliveryLog.sent_at.desc())
+
+    if channel and channel != "all":
+        query = query.where(DeliveryLog.channel == channel)
+    if status_filter and status_filter != "all":
+        query = query.where(DeliveryLog.status == status_filter)
+
+    result = await session.execute(query)
+    logs = result.scalars().all()
+
+    if search:
+        s = search.lower()
+        logs = [
+            l for l in logs
+            if s in l.recipient_name.lower()
+            or s in l.recipient_identifier.lower()
+            or (l.failure_reason and s in l.failure_reason.lower())
+        ]
+
+    return [
+        {
+            "id": l.id,
+            "recipient_identifier": l.recipient_identifier,
+            "recipient_name": l.recipient_name,
+            "channel": l.channel,
+            "language": l.language,
+            "status": l.status,
+            "failure_reason": l.failure_reason,
+            "retry_count": l.retry_count,
+            "latency_ms": l.latency_ms,
+            "is_opened": bool(l.is_opened),
+            "is_clicked": bool(l.is_clicked),
+            "has_response": bool(l.has_response),
+            "sent_at": l.sent_at.isoformat() if l.sent_at else None,
+            "delivered_at": l.delivered_at.isoformat() if l.delivered_at else None,
+            "opened_at": l.opened_at.isoformat() if l.opened_at else None,
+            "clicked_at": l.clicked_at.isoformat() if l.clicked_at else None,
+        }
+        for l in logs
+    ]
+
+
+@router.post(
+    "/distribution/{job_id}/retry",
+    tags=["milestone3", "distribution"],
+    summary="One-Click Retry for Failed Messages",
+)
+async def retry_failed_distribution(
+    job_id: str,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Retry all failed / retrying messages in a distribution job.
+    """
+    result = await distribution_service.retry_failed_messages(session=session, distribution_id=job_id)
+    return result
+
+
+@router.get(
+    "/distribution/{job_id}/feedback",
+    tags=["milestone3", "feedback"],
+    summary="Get Audience Feedback & Sentiment Breakdown",
+)
+async def get_job_feedback(
+    job_id: str,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Milestone 3 Step 6: Collect responses & analyze sentiment (Positive, Neutral, Negative).
+    """
+    result = await feedback_service.get_distribution_feedback(session=session, distribution_id=job_id)
+    return result
+
+
+@router.post(
+    "/distribution/{job_id}/feedback",
+    tags=["milestone3", "feedback"],
+    summary="Submit Audience Feedback / Response",
+)
+async def submit_audience_feedback(
+    job_id: str,
+    req: FeedbackSubmitRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Submit audience response and run AI sentiment classification."""
+    entry = await feedback_service.analyze_and_record_feedback(
+        session=session,
+        distribution_id=job_id,
+        recipient_name=req.recipient_name,
+        channel=req.channel,
+        language=req.language,
+        feedback_text=req.feedback_text,
+    )
+    return {
+        "id": entry.id,
+        "recipient_name": entry.recipient_name,
+        "channel": entry.channel,
+        "language": entry.language,
+        "feedback_text": entry.feedback_text,
+        "sentiment": entry.sentiment,
+        "sentiment_score": entry.sentiment_score,
+        "key_theme": entry.key_theme,
+        "created_at": entry.created_at.isoformat() if entry.created_at else None,
+    }
+
+
+@router.get(
+    "/analytics/overview",
+    tags=["milestone3", "analytics"],
+    summary="Get Platform-Wide Engagement Analytics & Insights",
+)
+async def get_analytics_overview(
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Milestone 3 Step 7: Comprehensive analytics platform:
+    - Campaign Performance KPIs (Total Reach, Delivery %, Open %, CTR %, Response %)
+    - Audience Trends & Time-Series Curves
+    - Channel-wise Reach Comparison
+    - Language-wise Engagement Breakdown
+    - Sentiment Distribution
+    """
+    result = await analytics_engine.get_platform_overview(session=session)
+    return result

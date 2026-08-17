@@ -189,6 +189,153 @@ export const qualityCheck = async (
   return response.data;
 };
 
+// ── Milestone 3: Multi-Channel Distribution & Analytics Interfaces ─────────────
+
+export interface ChannelMetric {
+  channel_name: string;
+  provider: string;
+  color: string;
+  total: number;
+  sent: number;
+  delivered: number;
+  failed: number;
+  retrying: number;
+  pending: number;
+  opens: number;
+  clicks: number;
+  responses: number;
+  delivery_rate_pct: number;
+  open_rate_pct: number;
+  ctr_pct: number;
+  response_rate_pct: number;
+}
+
+export interface DistributionJob {
+  id: string;
+  title: string;
+  content: string;
+  channels: string[];
+  language: string;
+  schedule_type: "immediate" | "scheduled" | "recurring";
+  scheduled_at?: string | null;
+  recurring_frequency?: string;
+  status: "pending" | "in_progress" | "completed" | "failed" | "paused";
+  total_recipients: number;
+  sent_count: number;
+  delivered_count: number;
+  failed_count: number;
+  retrying_count: number;
+  pending_count: number;
+  open_count: number;
+  click_count: number;
+  response_count: number;
+  channel_metrics?: Record<string, ChannelMetric>;
+  created_at?: string;
+}
+
+export interface LaunchDistributionRequest {
+  title: string;
+  content: string;
+  channels: string[];
+  language?: string;
+  schedule_type?: "immediate" | "scheduled" | "recurring";
+  scheduled_at?: string | null;
+  recurring_frequency?: string;
+  audience_size?: number;
+  campaign_id?: string | null;
+}
+
+export interface DeliveryLog {
+  id: string;
+  recipient_identifier: string;
+  recipient_name: string;
+  channel: string;
+  language: string;
+  status: "sent" | "delivered" | "failed" | "pending" | "retrying";
+  failure_reason?: string | null;
+  retry_count: number;
+  latency_ms: number;
+  is_opened: boolean;
+  is_clicked: boolean;
+  has_response: boolean;
+  sent_at?: string;
+  delivered_at?: string | null;
+  opened_at?: string | null;
+  clicked_at?: string | null;
+}
+
+export interface AudienceFeedbackItem {
+  id: string;
+  recipient_name: string;
+  channel: string;
+  language: string;
+  feedback_text: string;
+  sentiment: "positive" | "neutral" | "negative";
+  sentiment_score: number;
+  key_theme: string;
+  created_at?: string;
+}
+
+export interface FeedbackSummaryResponse {
+  distribution_id: string;
+  total_count: number;
+  sentiment_breakdown: {
+    positive_pct: number;
+    neutral_pct: number;
+    negative_pct: number;
+  };
+  feedbacks: AudienceFeedbackItem[];
+}
+
+export interface AnalyticsOverviewResponse {
+  summary: {
+    total_campaigns: number;
+    total_distributions: number;
+    total_audience_reach: number;
+    total_delivered: number;
+    total_failed: number;
+    total_retrying: number;
+    total_pending: number;
+    delivery_rate_pct: number;
+    open_rate_pct: number;
+    ctr_pct: number;
+    response_rate_pct: number;
+  };
+  sentiment_overview: {
+    positive_pct: number;
+    neutral_pct: number;
+    negative_pct: number;
+    average_score: number;
+    total_feedback_count: number;
+  };
+  hourly_trends: Array<{
+    time: string;
+    sent: number;
+    delivered: number;
+    opened: number;
+    clicked: number;
+  }>;
+  channels: Array<{
+    channel: string;
+    icon: string;
+    reach: number;
+    delivery_rate: number;
+    open_rate: number;
+    ctr: number;
+    response_rate: number;
+    status: string;
+    color: string;
+  }>;
+  languages: Array<{
+    code: string;
+    language: string;
+    reach: number;
+    delivery_rate: number;
+    open_rate: number;
+    sentiment_score: number;
+  }>;
+}
+
 // ── Admin endpoints ───────────────────────────────────────────────────────────
 export const adminGetUsers = async (): Promise<AdminUser[]> => {
   const response = await api.get("/admin/users");
@@ -205,6 +352,61 @@ export const adminUpdateUser = async (
 
 export const adminDeleteUser = async (userId: string): Promise<void> => {
   await api.delete(`/admin/users/${userId}`);
+};
+
+// ── Milestone 3: Distribution & Analytics Endpoints ───────────────────────────
+export const launchDistribution = async (
+  data: LaunchDistributionRequest
+): Promise<DistributionJob> => {
+  const response = await api.post("/distribution/launch", data);
+  return response.data;
+};
+
+export const getDistributionList = async (): Promise<DistributionJob[]> => {
+  const response = await api.get("/distribution/list");
+  return response.data;
+};
+
+export const getDistributionJob = async (
+  jobId: string
+): Promise<DistributionJob> => {
+  const response = await api.get(`/distribution/${jobId}`);
+  return response.data;
+};
+
+export const getDeliveryLogs = async (
+  jobId: string,
+  params?: { channel?: string; status_filter?: string; search?: string }
+): Promise<DeliveryLog[]> => {
+  const response = await api.get(`/distribution/${jobId}/logs`, { params });
+  return response.data;
+};
+
+export const retryFailedMessages = async (
+  jobId: string
+): Promise<{ distribution_id: string; recovered_count: number; message: string }> => {
+  const response = await api.post(`/distribution/${jobId}/retry`);
+  return response.data;
+};
+
+export const getDistributionFeedback = async (
+  jobId: string
+): Promise<FeedbackSummaryResponse> => {
+  const response = await api.get(`/distribution/${jobId}/feedback`);
+  return response.data;
+};
+
+export const submitAudienceFeedback = async (
+  jobId: string,
+  data: { recipient_name: string; channel: string; language: string; feedback_text: string }
+): Promise<AudienceFeedbackItem> => {
+  const response = await api.post(`/distribution/${jobId}/feedback`, data);
+  return response.data;
+};
+
+export const getAnalyticsOverview = async (): Promise<AnalyticsOverviewResponse> => {
+  const response = await api.get("/analytics/overview");
+  return response.data;
 };
 
 export default api;

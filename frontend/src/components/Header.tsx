@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Send,
   Settings,
   Shield,
   UserCircle,
@@ -24,8 +25,10 @@ import { useAuth } from "@/context/AuthContext";
 
 const authNavLinks = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/distribution", label: "Distribution", icon: Send },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

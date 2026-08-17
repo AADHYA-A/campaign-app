@@ -468,15 +468,22 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {/* Copy button */}
-                  <div style={{ padding: "0.5rem 0.75rem", borderTop: "1px solid var(--border)" }}>
+                  {/* Copy & Distribute buttons */}
+                  <div style={{ padding: "0.5rem 0.75rem", borderTop: "1px solid var(--border)", display: "flex", gap: "0.5rem" }}>
                     <button
                       onClick={() => handleCopy(displayContent)}
                       className="btn btn-ghost btn-sm"
-                      style={{ width: "100%" }}
+                      style={{ flex: 1 }}
                     >
                       {copied ? <><CheckCheck size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
                     </button>
+                    <Link
+                      href="/distribution"
+                      className="btn btn-primary btn-sm micro-hover"
+                      style={{ flex: 1, textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem" }}
+                    >
+                      <Zap size={13} /> Distribute (M3)
+                    </Link>
                   </div>
                 </div>
               )}
@@ -537,11 +544,12 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Links */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
           {[
-            { href: "/campaigns", label: "Browse Campaigns", icon: MessageSquare, desc: "View and manage all your campaigns", color: "#6366f1" },
-            { href: "/history", label: "Campaign History", icon: BarChart3, desc: "Past campaigns sorted by date", color: "#7c3aed" },
-            { href: "/settings", label: "Settings", icon: Globe, desc: "Configure defaults and preferences", color: "#059669" },
+            { href: "/distribution", label: "Multi-Channel Distribution", icon: Zap, desc: "Broadcast across Email, SMS, WhatsApp & Push", color: "#3b82f6" },
+            { href: "/analytics", label: "Analytics Platform", icon: BarChart3, desc: "Channel-wise reach, Indic breakdown & sentiment", color: "#10b981" },
+            { href: "/campaigns", label: "Browse Campaigns", icon: MessageSquare, desc: "View and manage all your generated campaigns", color: "#6366f1" },
+            { href: "/history", label: "Campaign History", icon: TrendingUp, desc: "Past campaigns sorted with audit logs", color: "#7c3aed" },
           ].map(({ href, label, icon: Icon, desc, color }) => (
             <Link key={href} href={href} className="card micro-hover" style={{ textDecoration: "none", color: "inherit", cursor: "pointer", display: "block" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
