@@ -1,6 +1,6 @@
 # Campaign App
 
-**Live Website:** [https://campaign-app-imiu-pg1lrknqp-aadhya-as-projects.vercel.app/](https://campaign-app-imiu-pg1lrknqp-aadhya-as-projects.vercel.app/)
+**Live Website:** [https://campaign-bycorncha-aadhya-as-projects.vercel.app/)
 
 ## How to Run the Application
 
