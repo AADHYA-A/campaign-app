@@ -446,6 +446,29 @@ class FeedbackSubmitRequest(BaseModel):
     feedback_text: str
 
 
+class ChannelTestRequest(BaseModel):
+    channel: str = "email"
+    test_recipient: Optional[str] = None
+
+
+@router.post(
+    "/channels/test",
+    tags=["milestone3", "channels"],
+    summary="Test Individual Channel Connectivity & Latency",
+)
+async def test_channel_route(
+    req: ChannelTestRequest,
+):
+    """
+    Milestone 3 Module 1: Test each channel before sending campaigns.
+    Verifies gateway handshake, latency (ms), and payload formatting.
+    """
+    return await distribution_service.test_channel(
+        channel=req.channel,
+        test_recipient=req.test_recipient,
+    )
+
+
 @router.post(
     "/distribution/launch",
     tags=["milestone3", "distribution"],

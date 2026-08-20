@@ -5,11 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import {
   BarChart3,
+  BookOpen,
   Globe,
   History,
   Home,
   LayoutDashboard,
-  LogIn,
   LogOut,
   Menu,
   MessageSquare,
@@ -17,7 +17,6 @@ import {
   Settings,
   Shield,
   UserCircle,
-  UserPlus,
   X,
   Zap,
 } from "lucide-react";
@@ -31,6 +30,11 @@ const authNavLinks = [
   { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
+];
+
+const publicNavLinks = [
+  { href: "/", label: "Home", icon: Home },
+  { href: "/guide", label: "How to Use", icon: BookOpen },
 ];
 
 function AvatarBadge({ name, email }: { name?: string | null; email: string }) {
@@ -167,8 +171,8 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* Desktop Nav (When Authenticated) */}
-          {isAuthenticated && (
+          {/* Desktop Nav */}
+          {isAuthenticated ? (
             <nav
               style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
               className="desktop-nav"
@@ -186,236 +190,78 @@ export default function Header() {
                   </Link>
                 );
               })}
-              <Link
-                href="/admin"
-                className={`nav-link${pathname === "/admin" ? " active" : ""}`}
-                style={{
-                  color: isAdmin ? "#d97706" : "inherit",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                }}
-              >
-                <Shield size={15} color={isAdmin ? "#d97706" : undefined} />
-                Admin
-                {isAdmin && (
-                  <span
-                    style={{
-                      fontSize: "0.65rem",
-                      padding: "0.1rem 0.4rem",
-                      borderRadius: 999,
-                      background: "rgba(217,119,6,0.15)",
-                      color: "#d97706",
-                      fontWeight: 700,
-                    }}
+            </nav>
+          ) : (
+            <nav
+              style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
+              className="desktop-nav"
+            >
+              {publicNavLinks.map(({ href, label, icon: Icon }) => {
+                const isActive = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`nav-link${isActive ? " active" : ""}`}
                   >
-                    PRO
-                  </span>
-                )}
-              </Link>
+                    <Icon size={15} />
+                    {label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
 
           {/* Right Actions */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
-            {isAuthenticated && (
-              <Link
-                href="/dashboard"
-                className="btn btn-primary"
-                style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
-              >
-                <Zap size={15} />
-                New Campaign
-              </Link>
-            )}
-
             {/* Auth area */}
             {!isLoading && (
               <>
                 {isAuthenticated && user ? (
-                  /* ── Authenticated: avatar dropdown ── */
-                  <div style={{ position: "relative" }} ref={userMenuRef}>
-                    <button
-                      onClick={() => setUserMenuOpen(!userMenuOpen)}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center" }}
-                      aria-label="User menu"
-                      aria-expanded={userMenuOpen}
-                    >
-                      <AvatarBadge name={user.full_name} email={user.email} />
-                    </button>
-
-                    {/* Dropdown */}
-                    {userMenuOpen && (
-                      <div
-                        className="animate-scale-in"
-                        style={{
-                          position: "absolute",
-                          right: 0,
-                          top: "calc(100% + 0.5rem)",
-                          minWidth: 220,
-                          background: "var(--surface-elevated)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "var(--radius-lg)",
-                          boxShadow: "0 16px 40px rgba(0,0,0,0.15)",
-                          overflow: "hidden",
-                          zIndex: 100,
-                        }}
-                      >
-                        {/* User info header */}
-                        <div
-                          style={{
-                            padding: "1rem 1rem 0.75rem",
-                            borderBottom: "1px solid var(--border)",
-                          }}
-                        >
-                          <div style={{ fontWeight: 700, fontSize: "0.9rem", marginBottom: "0.15rem" }}>
-                            {user.full_name || "User"}
-                          </div>
-                          <div style={{ fontSize: "0.78rem", color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {user.email}
-                          </div>
-                          {isAdmin && (
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.25rem",
-                                marginTop: "0.4rem",
-                                fontSize: "0.7rem",
-                                fontWeight: 700,
-                                color: "#d97706",
-                                background: "rgba(217,119,6,0.1)",
-                                padding: "0.15rem 0.5rem",
-                                borderRadius: 999,
-                              }}
-                            >
-                              <Shield size={10} />
-                              Admin
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Menu items */}
-                        <div style={{ padding: "0.4rem 0" }}>
-                          <Link
-                            href="/profile"
-                            onClick={() => setUserMenuOpen(false)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.6rem",
-                              padding: "0.6rem 1rem",
-                              fontSize: "0.85rem",
-                              color: "var(--foreground)",
-                              textDecoration: "none",
-                              transition: "background 0.15s",
-                            }}
-                            className="dropdown-item"
-                          >
-                            <UserCircle size={15} />
-                            My Profile
-                          </Link>
-                          <Link
-                            href="/settings"
-                            onClick={() => setUserMenuOpen(false)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.6rem",
-                              padding: "0.6rem 1rem",
-                              fontSize: "0.85rem",
-                              color: "var(--foreground)",
-                              textDecoration: "none",
-                            }}
-                            className="dropdown-item"
-                          >
-                            <Settings size={15} />
-                            Settings
-                          </Link>
-                          {isAdmin && (
-                            <Link
-                              href="/admin"
-                              onClick={() => setUserMenuOpen(false)}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.6rem",
-                                padding: "0.6rem 1rem",
-                                fontSize: "0.85rem",
-                                color: "#d97706",
-                                textDecoration: "none",
-                              }}
-                              className="dropdown-item"
-                            >
-                              <Shield size={15} />
-                              Admin Panel
-                            </Link>
-                          )}
-                        </div>
-
-                        <div style={{ borderTop: "1px solid var(--border)", padding: "0.4rem 0" }}>
-                          <button
-                            onClick={handleLogout}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.6rem",
-                              padding: "0.6rem 1rem",
-                              fontSize: "0.85rem",
-                              color: "#dc2626",
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              width: "100%",
-                              textAlign: "left",
-                            }}
-                            className="dropdown-item"
-                          >
-                            <LogOut size={15} />
-                            Sign out
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* ── Unauthenticated: Admin Login, Sign In & Sign Up / Register buttons ── */
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }} className="desktop-nav">
+                  /* ── Authenticated: Hi greeting + Logout ── */
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    {/* Hi, Name greeting */}
                     <Link
-                      href="/login?role=admin"
-                      className={`btn ${pathname === "/login" && typeof window !== "undefined" && window.location.search.includes("admin") ? "btn-secondary" : "btn-ghost"}`}
+                      href="/profile"
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "0.4rem",
-                        fontSize: "0.85rem",
-                        padding: "0.5rem 0.85rem",
-                        color: "#d97706",
-                        border: "1px solid rgba(217,119,6,0.25)",
-                        background: "rgba(217,119,6,0.06)",
+                        gap: "0.5rem",
+                        textDecoration: "none",
+                        padding: "0.3rem 0.75rem 0.3rem 0.4rem",
+                        borderRadius: "var(--radius-md)",
+                        background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(124,58,237,0.08))",
+                        border: "1px solid rgba(99,102,241,0.18)",
+                        transition: "all 0.18s ease",
                       }}
+                      title="View Profile"
+                      className="desktop-nav"
                     >
-                      <Shield size={14} color="#d97706" />
-                      Admin Login
+                      <AvatarBadge name={user.full_name} email={user.email} />
+                      <span style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--foreground)" }}>
+                        Hi, {(user.full_name || user.email.split("@")[0]).split(" ")[0]}!
+                      </span>
                     </Link>
-                    <Link
-                      href="/login"
-                      className={`btn ${pathname === "/login" ? "btn-secondary" : "btn-ghost"}`}
-                      style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem", padding: "0.5rem 0.85rem" }}
+
+                    {/* Logout */}
+                    <button
+                      onClick={handleLogout}
+                      className="btn btn-secondary btn-sm"
+                      style={{
+                        fontSize: "0.82rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        color: "#dc2626",
+                        borderColor: "rgba(220, 38, 38, 0.3)",
+                      }}
+                      title="Log out"
                     >
-                      <LogIn size={15} />
-                      Sign In
-                    </Link>
-                    <Link
-                      href="/register"
-                      className={`btn ${pathname === "/register" || pathname === "/signup" ? "btn-primary" : "btn-secondary"}`}
-                      style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem", padding: "0.5rem 0.85rem" }}
-                    >
-                      <UserPlus size={15} />
-                      Sign Up / Register
-                    </Link>
+                      <LogOut size={15} />
+                      <span className="desktop-nav">Logout</span>
+                    </button>
                   </div>
-                )}
+                ) : null}
               </>
             )}
 
@@ -475,54 +321,46 @@ export default function Header() {
                     </Link>
                   );
                 })}
-                <Link
-                  href="/admin"
-                  onClick={() => setMobileOpen(false)}
-                  className={`nav-link${pathname === "/admin" ? " active" : ""}`}
-                  style={{
-                    padding: "0.75rem 1rem",
-                    fontSize: "0.95rem",
-                    color: isAdmin ? "#d97706" : "inherit",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <Shield size={18} color={isAdmin ? "#d97706" : undefined} />
-                  Admin Panel {isAdmin && "(PRO)"}
-                </Link>
               </>
             ) : (
-              <Link
-                href="/"
-                onClick={() => setMobileOpen(false)}
-                className={`nav-link${pathname === "/" ? " active" : ""}`}
-                style={{ padding: "0.75rem 1rem", fontSize: "0.95rem" }}
-              >
-                <Home size={18} />
-                Home
-              </Link>
+              <>
+                {publicNavLinks.map(({ href, label, icon: Icon }) => {
+                  const isActive = pathname === href;
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`nav-link${isActive ? " active" : ""}`}
+                      style={{ padding: "0.75rem 1rem", fontSize: "0.95rem" }}
+                    >
+                      <Icon size={18} />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </>
             )}
 
             {/* Mobile auth actions */}
             {!isLoading && (
               <div style={{ borderTop: "1px solid var(--border)", marginTop: "0.5rem", paddingTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {isAuthenticated ? (
+                {isAuthenticated && user ? (
                   <>
-                    <Link
-                      href="/dashboard"
-                      onClick={() => setMobileOpen(false)}
-                      className="btn btn-primary"
-                      style={{ justifyContent: "center", gap: "0.5rem" }}
-                    >
-                      <Zap size={17} />
-                      New Campaign
-                    </Link>
+                    <div style={{ padding: "0.65rem 1rem", display: "flex", alignItems: "center", gap: "0.6rem", background: "linear-gradient(135deg, rgba(99,102,241,0.06), rgba(124,58,237,0.06))", borderRadius: "var(--radius-md)", margin: "0 0 0.25rem" }}>
+                      <AvatarBadge name={user.full_name} email={user.email} />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--foreground)" }}>
+                          Hi, {(user.full_name || user.email.split("@")[0]).split(" ")[0]}!
+                        </div>
+                        <div style={{ fontSize: "0.72rem", color: "#64748b" }}>{user.email}</div>
+                      </div>
+                    </div>
                     <Link
                       href="/profile"
                       onClick={() => setMobileOpen(false)}
                       className="nav-link"
-                      style={{ padding: "0.75rem 1rem", fontSize: "0.95rem" }}
+                      style={{ padding: "0.75rem 1rem", fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "0.5rem" }}
                     >
                       <UserCircle size={18} />
                       My Profile
@@ -533,46 +371,10 @@ export default function Header() {
                       style={{ padding: "0.75rem 1rem", fontSize: "0.95rem", color: "#dc2626", background: "none", border: "none", cursor: "pointer", textAlign: "left", width: "100%", display: "flex", alignItems: "center", gap: "0.5rem" }}
                     >
                       <LogOut size={18} />
-                      Sign out
+                      Logout
                     </button>
                   </>
-                ) : (
-                  <>
-                    <Link
-                      href="/login?role=admin"
-                      onClick={() => setMobileOpen(false)}
-                      className="btn btn-ghost"
-                      style={{
-                        justifyContent: "center",
-                        gap: "0.5rem",
-                        color: "#d97706",
-                        border: "1px solid rgba(217,119,6,0.25)",
-                        background: "rgba(217,119,6,0.06)",
-                      }}
-                    >
-                      <Shield size={17} color="#d97706" />
-                      Admin Login
-                    </Link>
-                    <Link
-                      href="/login"
-                      onClick={() => setMobileOpen(false)}
-                      className={`btn ${pathname === "/login" ? "btn-primary" : "btn-secondary"}`}
-                      style={{ justifyContent: "center", gap: "0.5rem" }}
-                    >
-                      <LogIn size={17} />
-                      Sign In
-                    </Link>
-                    <Link
-                      href="/register"
-                      onClick={() => setMobileOpen(false)}
-                      className={`btn ${pathname === "/register" || pathname === "/signup" ? "btn-secondary" : "btn-primary"}`}
-                      style={{ justifyContent: "center", gap: "0.5rem" }}
-                    >
-                      <UserPlus size={17} />
-                      Sign Up / Register
-                    </Link>
-                  </>
-                )}
+                ) : null}
               </div>
             )}
           </div>

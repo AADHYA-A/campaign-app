@@ -77,25 +77,21 @@ export default function LoginPage() {
           }}
         >
           {/* Logo + heading */}
-          <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+          <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
             <div
               style={{
                 width: 52,
                 height: 52,
                 borderRadius: 16,
-                background: isAdminMode
-                  ? "linear-gradient(135deg, #d97706 0%, #b45309 100%)"
-                  : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 margin: "0 auto 1rem",
-                boxShadow: isAdminMode
-                  ? "0 8px 24px rgba(217,119,6,0.4)"
-                  : "0 8px 24px rgba(79,70,229,0.4)",
+                boxShadow: "0 8px 24px rgba(79,70,229,0.4)",
               }}
             >
-              {isAdminMode ? <Shield size={24} color="#fff" /> : <Globe size={24} color="#fff" />}
+              <Globe size={24} color="#fff" />
             </div>
             <h1
               style={{
@@ -105,78 +101,11 @@ export default function LoginPage() {
                 marginBottom: "0.4rem",
               }}
             >
-              {isAdminMode ? "Admin Login" : "Welcome back"}
+              Welcome back
             </h1>
             <p style={{ color: "#64748b", fontSize: "0.9rem" }}>
-              {isAdminMode ? "Sign in with administrator credentials" : "Sign in to Campaigns Hub"}
+              Sign in to your Campaigns Hub account
             </p>
-          </div>
-
-          {/* Mode Switcher */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "0.25rem",
-              padding: "0.25rem",
-              background: "var(--surface)",
-              borderRadius: "var(--radius-md)",
-              marginBottom: "1.5rem",
-              border: "1px solid var(--border)",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdminMode(false);
-                setError(null);
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.4rem",
-                padding: "0.5rem",
-                borderRadius: "calc(var(--radius-md) - 3px)",
-                border: "none",
-                fontSize: "0.82rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                background: !isAdminMode ? "#fff" : "transparent",
-                color: !isAdminMode ? "var(--primary)" : "#64748b",
-                boxShadow: !isAdminMode ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
-              }}
-            >
-              <User size={14} />
-              User Login
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdminMode(true);
-                setError(null);
-                if (!email) setEmail("admin@campaigns.hub");
-                if (!password) setPassword("admin123");
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.4rem",
-                padding: "0.5rem",
-                borderRadius: "calc(var(--radius-md) - 3px)",
-                border: "none",
-                fontSize: "0.82rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                background: isAdminMode ? "#fff" : "transparent",
-                color: isAdminMode ? "#d97706" : "#64748b",
-                boxShadow: isAdminMode ? "0 2px 8px rgba(217,119,6,0.15)" : "none",
-              }}
-            >
-              <Shield size={14} color={isAdminMode ? "#d97706" : "#64748b"} />
-              Admin Login
-            </button>
           </div>
 
           {/* Error alert */}
@@ -341,13 +270,13 @@ export default function LoginPage() {
             <div className="divider" style={{ flex: 1, margin: 0 }} />
           </div>
 
-          {/* Register link */}
+          {/* Sign Up link */}
           <Link
             href="/register"
             className="btn btn-secondary"
-            style={{ width: "100%", justifyContent: "center" }}
+            style={{ width: "100%", justifyContent: "center", gap: "0.4rem" }}
           >
-            Create an account
+            Sign Up
           </Link>
         </div>
 

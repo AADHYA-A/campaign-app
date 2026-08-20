@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BarChart3,
+  BookOpen,
   Globe,
   Languages,
   MessageSquare,
@@ -365,7 +366,7 @@ export default function HomePage() {
                   fontSize: "1.1rem",
                   color: "#64748b",
                   lineHeight: 1.7,
-                  marginBottom: "2rem",
+                  marginBottom: "1.5rem",
                   maxWidth: 520,
                 }}
               >
@@ -373,6 +374,29 @@ export default function HomePage() {
                 into 20+ Indian languages with state-of-the-art IndicTrans2 translation,
                 sentiment analysis, and engagement analytics.
               </p>
+
+              {/* How to Use button */}
+              <div style={{ marginBottom: "1.75rem" }}>
+                <Link
+                  href="/guide"
+                  className="btn btn-secondary micro-hover"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontWeight: 700,
+                    fontSize: "0.9rem",
+                    padding: "0.55rem 1.1rem",
+                    borderColor: "rgba(99,102,241,0.3)",
+                    background: "rgba(99,102,241,0.06)",
+                    color: "var(--primary)",
+                  }}
+                >
+                  <BookOpen size={16} color="var(--primary)" />
+                  How to Use Guide & Walkthrough
+                  <ArrowRight size={14} />
+                </Link>
+              </div>
 
               {/* Floating language pills */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "2.5rem" }}>
@@ -512,12 +536,12 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                {/* 3-Tab Selector */}
+                {/* Auth Mode Toggle: Sign In and Sign Up */}
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr 1fr",
-                    gap: "0.35rem",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "0.3rem",
                     padding: "0.3rem",
                     background: "var(--surface)",
                     borderRadius: "var(--radius-md)",
@@ -539,7 +563,7 @@ export default function HomePage() {
                       padding: "0.6rem 0.5rem",
                       borderRadius: "calc(var(--radius-md) - 3px)",
                       border: "none",
-                      fontSize: "0.82rem",
+                      fontSize: "0.85rem",
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.2s ease",
@@ -566,7 +590,7 @@ export default function HomePage() {
                       padding: "0.6rem 0.5rem",
                       borderRadius: "calc(var(--radius-md) - 3px)",
                       border: "none",
-                      fontSize: "0.82rem",
+                      fontSize: "0.85rem",
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.2s ease",
@@ -576,34 +600,7 @@ export default function HomePage() {
                     }}
                   >
                     <UserPlus size={14} />
-                    Register
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode("admin");
-                      setFormError(null);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.35rem",
-                      padding: "0.6rem 0.5rem",
-                      borderRadius: "calc(var(--radius-md) - 3px)",
-                      border: "none",
-                      fontSize: "0.82rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      background: authMode === "admin" ? "#fff" : "transparent",
-                      color: authMode === "admin" ? "#d97706" : "#64748b",
-                      boxShadow: authMode === "admin" ? "0 2px 8px rgba(217,119,6,0.15)" : "none",
-                    }}
-                  >
-                    <Shield size={14} color={authMode === "admin" ? "#d97706" : "#64748b"} />
-                    Admin
+                    Sign Up
                   </button>
                 </div>
 
@@ -976,7 +973,7 @@ export default function HomePage() {
                       ) : (
                         <>
                           <UserPlus size={16} />
-                          Sign Up & Register
+                          Sign Up
                         </>
                       )}
                     </button>

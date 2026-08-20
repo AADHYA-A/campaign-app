@@ -1,7 +1,10 @@
 import uuid
 from sqlalchemy import Column, String, Text, DateTime, Float, ForeignKey
 from datetime import datetime, timezone
-from fastapi_users_db_sqlalchemy.generics import GUID
+try:
+    from fastapi_users_db_sqlalchemy.generics import GUID
+except ImportError:
+    from sqlalchemy.types import String as GUID
 from app.models.base import Base
 
 

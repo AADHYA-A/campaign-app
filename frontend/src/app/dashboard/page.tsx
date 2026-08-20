@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import {
   BarChart3,
+  BookOpen,
   Users,
   MessageSquare,
   Zap,
@@ -79,11 +80,56 @@ const AUDIENCE_TYPES = [
   { value: "women", label: "Women" },
 ];
 
+// Animated Dynamic Stat Number Component
+function AnimatedStatNumber({
+  target,
+  prefix = "",
+  suffix = "",
+  decimals = 0,
+}: {
+  target: number;
+  prefix?: string;
+  suffix?: string;
+  decimals?: number;
+}) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const duration = 1100;
+    const stepTime = 20;
+    const totalSteps = duration / stepTime;
+    const increment = target / totalSteps;
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= target) {
+        setCount(target);
+        clearInterval(timer);
+      } else {
+        setCount(start);
+      }
+    }, stepTime);
+
+    return () => clearInterval(timer);
+  }, [target]);
+
+  const formatted = decimals > 0 ? count.toFixed(decimals) : Math.round(count).toLocaleString();
+
+  return (
+    <span className="animate-pop" style={{ display: "inline-block" }}>
+      {prefix}
+      {formatted}
+      {suffix}
+    </span>
+  );
+}
+
 const stats = [
-  { label: "Total Reach", value: "2.4M", icon: Users, change: "+12%", color: "#3b82f6", bg: "rgba(59,130,246,0.1)" },
-  { label: "Active Campaigns", value: "14", icon: Zap, change: "+3", color: "#d97706", bg: "rgba(217,119,6,0.1)" },
-  { label: "Translations", value: "85K", icon: Globe, change: "+8%", color: "#059669", bg: "rgba(5,150,105,0.1)" },
-  { label: "Avg Engagement", value: "68%", icon: BarChart3, change: "+4%", color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
+  { label: "Total Reach", target: 2.4, suffix: "M", decimals: 1, icon: Users, change: "+12%", color: "#3b82f6", bg: "rgba(59,130,246,0.1)" },
+  { label: "Active Campaigns", target: 18, suffix: "", decimals: 0, isLive: true, icon: Zap, change: "+4", color: "#d97706", bg: "rgba(217,119,6,0.1)" },
+  { label: "Translations", target: 85.6, suffix: "K", decimals: 1, icon: Globe, change: "+8%", color: "#059669", bg: "rgba(5,150,105,0.1)" },
+  { label: "Avg Engagement", target: 68.4, suffix: "%", decimals: 1, icon: BarChart3, change: "+4%", color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
 ];
 
 // Pipeline step config
@@ -308,9 +354,25 @@ export default function DashboardPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
           <div>
             <h1 className="page-title gradient-text" style={{ marginBottom: "0.25rem" }}>Dashboard</h1>
-            <p style={{ color: "#64748b", fontSize: "0.9rem" }}>AI-powered multilingual campaign engine — Milestone 2.</p>
+            <p style={{ color: "#64748b", fontSize: "0.9rem" }}>AI-powered multilingual campaign creation & management engine.</p>
           </div>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+            <Link
+              href="/guide"
+              className="btn btn-secondary micro-hover"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                background: "rgba(99,102,241,0.06)",
+                borderColor: "rgba(99,102,241,0.25)",
+                color: "#6366f1",
+                fontWeight: 600,
+              }}
+            >
+              <BookOpen size={15} color="#6366f1" />
+              How to Use
+            </Link>
             <button onClick={handleExport} className="btn btn-secondary" disabled={!result}>
               <Download size={15} />
               Export JSON
@@ -322,20 +384,35 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats Row */}
+        {/* Stats Row with Dynamic Animated Numbers & Live Badges */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.25rem" }}>
           {stats.map((stat) => (
-            <div key={stat.label} className="glass-card micro-hover" style={{ cursor: "default" }}>
+            <div
+              key={stat.label}
+              className="glass-card micro-hover"
+              style={{
+                cursor: "default",
+                position: "relative",
+                overflow: "hidden",
+                border: "1px solid rgba(255,255,255,0.6)",
+                boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+              }}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <p className="stat-label">{stat.label}</p>
-                  <p className="stat-value" style={{ marginTop: "0.5rem" }}>{stat.value}</p>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem", fontSize: "0.75rem", fontWeight: 600, color: "#059669", marginTop: "0.4rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <p className="stat-label">{stat.label}</p>
+                    {stat.isLive && <span className="live-dot" title="Live real-time active dispatch" />}
+                  </div>
+                  <p className="stat-value" style={{ marginTop: "0.4rem", color: stat.color, fontWeight: 900 }}>
+                    <AnimatedStatNumber target={stat.target} suffix={stat.suffix} decimals={stat.decimals} />
+                  </p>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem", fontSize: "0.75rem", fontWeight: 700, color: "#059669", marginTop: "0.4rem" }}>
                     <TrendingUp size={12} />
-                    {stat.change} this week
+                    {stat.change} live
                   </span>
                 </div>
-                <div style={{ width: 46, height: 46, borderRadius: 12, background: stat.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: stat.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 4px 14px ${stat.bg}` }}>
                   <stat.icon size={22} color={stat.color} />
                 </div>
               </div>
@@ -382,7 +459,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Milestone 2 AI Campaign Engine */}
+          {/* AI Campaign Engine */}
           <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2 className="section-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -405,7 +482,7 @@ export default function DashboardPage() {
               {!result ? (
                 <div style={{ padding: "1rem", fontSize: "0.875rem", lineHeight: 1.6, color: "var(--foreground)" }}>
                   <div style={{ background: "var(--primary-light)", borderRadius: "14px 14px 14px 0", padding: "0.75rem 1rem", maxWidth: "88%", marginBottom: "0.75rem" }}>
-                    <strong>👋 Hey!</strong> Enter a topic, choose tone, language & audience — then hit <strong>Generate</strong> for the full Milestone 2 pipeline.
+                    <strong>👋 Hey!</strong> Enter a topic, choose tone, language & audience — then hit <strong>Generate</strong> for the full AI generation pipeline.
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginTop: "0.5rem" }}>
                     {PIPELINE_STEPS.map((ps) => (

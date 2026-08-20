@@ -382,7 +382,7 @@ export default function RegisterPage() {
               ) : (
                 <>
                   <UserPlus size={17} />
-                  Create account
+                  Sign Up
                 </>
               )}
             </button>

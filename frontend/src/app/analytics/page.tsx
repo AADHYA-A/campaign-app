@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import {
   BarChart3,
+  BookOpen,
   TrendingUp,
   Users,
   Send,
@@ -201,10 +202,10 @@ export default function AnalyticsPage() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
               <span className="badge badge-purple" style={{ fontSize: "0.75rem", fontWeight: 700 }}>
-                MILESTONE 3 ANALYTICS
+                ENGAGEMENT INTELLIGENCE
               </span>
               <span className="badge badge-green" style={{ fontSize: "0.75rem" }}>
-                Live Stream Engine
+                Live Analytics
               </span>
             </div>
             <h1 className="page-title gradient-text" style={{ fontSize: "2rem", marginBottom: "0.35rem" }}>
@@ -215,7 +216,24 @@ export default function AnalyticsPage() {
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+            <Link
+              href="/guide"
+              className="btn btn-secondary micro-hover"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                background: "rgba(99,102,241,0.06)",
+                borderColor: "rgba(99,102,241,0.25)",
+                color: "#6366f1",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+              }}
+            >
+              <BookOpen size={14} color="#6366f1" />
+              How to Use
+            </Link>
             <button onClick={exportReport} className="btn btn-secondary micro-hover">
               <Download size={14} /> Export CSV Report
             </button>

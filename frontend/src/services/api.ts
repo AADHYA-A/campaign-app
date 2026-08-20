@@ -404,6 +404,30 @@ export const submitAudienceFeedback = async (
   return response.data;
 };
 
+export interface ChannelTestResult {
+  channel: string;
+  channel_name: string;
+  provider: string;
+  status: string;
+  http_status: number;
+  latency_ms: number;
+  target: string;
+  message_id: string;
+  verified_at: string;
+  message: string;
+}
+
+export const testChannel = async (
+  channel: string,
+  test_recipient?: string
+): Promise<ChannelTestResult> => {
+  const response = await api.post("/channels/test", {
+    channel,
+    test_recipient,
+  });
+  return response.data;
+};
+
 export const getAnalyticsOverview = async (): Promise<AnalyticsOverviewResponse> => {
   const response = await api.get("/analytics/overview");
   return response.data;
