@@ -47,13 +47,3 @@ npm run dev
 Once both are running, open your web browser and navigate to `http://localhost:3000` to interact with the app.
 
 ---
-
-## How to Upload to GitHub
-
-Whenever you make changes to the code, you can upload them to the project branch by running these three commands in your terminal (make sure you are in the root `campaign-app` folder):
-
-```bash
-git add .
-git commit -m "Describe your changes here"
-git push internship main:AADHYA_A
-```
