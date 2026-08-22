@@ -1,46 +1,43 @@
 import os
 import json
 import asyncio
-import requests
+import google.generativeai as genai
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:latest")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+# Configure the SDK once at module load time
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 class LLMService:
     def __init__(self):
-        self.base_url = OLLAMA_BASE_URL
-        self.model = OLLAMA_MODEL
+        self.model_name = GEMINI_MODEL
+
+    def _get_model(self):
+        if not GEMINI_API_KEY:
+            raise RuntimeError(
+                "GEMINI_API_KEY environment variable is not set. "
+                "Get a free key at https://aistudio.google.com/app/apikey and add it to Vercel."
+            )
+        return genai.GenerativeModel(self.model_name)
 
     def _chat_sync(self, system_prompt: str, user_prompt: str) -> str:
-        """Blocking Ollama HTTP call — must be run via asyncio.to_thread from async context."""
-        response = requests.post(
-            f"{self.base_url}/api/chat",
-            json={
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "stream": False,
-            },
-            timeout=120,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["message"]["content"].strip()
+        """Blocking Gemini API call — must be run via asyncio.to_thread from async context."""
+        model = self._get_model()
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+        response = model.generate_content(full_prompt)
+        return response.text.strip()
 
     async def _chat(self, system_prompt: str, user_prompt: str) -> str:
-        """Async wrapper — offloads the blocking requests call to a thread pool."""
+        """Async wrapper — offloads the blocking SDK call to a thread pool."""
         try:
             return await asyncio.to_thread(self._chat_sync, system_prompt, user_prompt)
-        except requests.exceptions.ConnectionError:
-            raise RuntimeError(
-                f"Cannot connect to Ollama at {self.base_url}. "
-                "Make sure Ollama is running (`ollama serve`)."
-            )
+        except RuntimeError:
+            raise
         except Exception as e:
-            raise RuntimeError(f"Ollama request failed: {e}")
+            raise RuntimeError(f"Gemini API request failed: {e}")
 
     # ── 1. AI Content Generation ──────────────────────────────────────────────
     async def generate_campaign_content(self, topic: str, tone: str = "professional") -> str:

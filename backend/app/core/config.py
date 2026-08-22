@@ -14,9 +14,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    # LLM – Ollama local inference
-    OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
-    OLLAMA_MODEL: str = "llama3.1:latest"
+    # LLM – Google Gemini (cloud inference — works on Vercel)
+    # Get a free key at: https://aistudio.google.com/app/apikey
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-1.5-flash"
 
     class Config:
         env_file = ".env"
