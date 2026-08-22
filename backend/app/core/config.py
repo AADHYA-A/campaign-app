@@ -39,8 +39,12 @@ def _clean_asyncpg_query(query: str) -> str:
     params.pop("channel_binding", None)
     sslmode = params.pop("sslmode", None)
     if sslmode and "ssl" not in params:
-        # asyncpg treats any of require/verify-full/verify-ca as "use TLS"
-        params["ssl"] = "true" if sslmode != "disable" else "false"
+        # asyncpg (>=0.30) accepts 'ssl' as a mode string directly
+        # (disable/allow/prefer/require/verify-ca/verify-full) -- just
+        # rename the key, keep the original value unchanged. Passing
+        # something like "true" here fails: asyncpg tries to parse it
+        # as one of those mode strings and raises ClientConfigurationError.
+        params["ssl"] = sslmode
     return urlencode(params)
 
 
