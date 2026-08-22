@@ -23,8 +23,26 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 import os
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 settings = Settings()
+
+
+def _clean_asyncpg_query(query: str) -> str:
+    """asyncpg's connect() only understands a subset of libpq query params.
+    Neon / Vercel Postgres connection strings include 'channel_binding' and
+    'sslmode', neither of which asyncpg accepts directly — passing them
+    raises `TypeError: connect() got an unexpected keyword argument
+    'channel_binding'`. Strip channel_binding entirely and translate
+    sslmode -> ssl (the form asyncpg/SQLAlchemy does understand)."""
+    params = dict(parse_qsl(query, keep_blank_values=True))
+    params.pop("channel_binding", None)
+    sslmode = params.pop("sslmode", None)
+    if sslmode and "ssl" not in params:
+        # asyncpg treats any of require/verify-full/verify-ca as "use TLS"
+        params["ssl"] = "true" if sslmode != "disable" else "false"
+    return urlencode(params)
+
 
 # Automatically configure databases for Vercel's built-in Postgres and KV Add-ons
 if os.getenv("POSTGRES_URL"):
@@ -32,11 +50,22 @@ if os.getenv("POSTGRES_URL"):
     # Normalize postgres:// to postgresql:// first if it exists
     if raw_url.startswith("postgres://"):
         raw_url = raw_url.replace("postgres://", "postgresql://", 1)
-    
+
     # Replace the standard postgresql:// prefix with the appropriate async/sync driver scheme
     if raw_url.startswith("postgresql://"):
-        settings.DATABASE_URL = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        settings.SYNC_DATABASE_URL = raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        async_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        sync_url = raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+        # Strip/translate params that break asyncpg specifically (sync driver
+        # via psycopg2 is fine with sslmode/channel_binding as-is)
+        split = urlsplit(async_url)
+        cleaned_query = _clean_asyncpg_query(split.query)
+        async_url = urlunsplit(
+            (split.scheme, split.netloc, split.path, cleaned_query, split.fragment)
+        )
+
+        settings.DATABASE_URL = async_url
+        settings.SYNC_DATABASE_URL = sync_url
     else:
         # Fallback if it's already using a custom driver or scheme
         settings.DATABASE_URL = raw_url
