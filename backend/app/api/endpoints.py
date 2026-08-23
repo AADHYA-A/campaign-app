@@ -14,7 +14,7 @@ from app.services.feedback_service import feedback_service
 from app.core.database import get_async_session
 from app.core.users import optional_current_user, current_active_user
 from app.models.campaign import Campaign
-from app.models.distribution import DistributionJob, DeliveryLog, AudienceFeedback
+from app.models.distribution import DistributionJob, DeliveryLog, AudienceFeedback, Recipient
 from app.models.user import User
 from app.schemas.user import UserRead, UserUpdate
 from pydantic import BaseModel, Field
@@ -427,6 +427,22 @@ async def admin_delete_user(
 # Milestone 3: Multi-Channel Distribution & Engagement Analytics Platform
 # ─────────────────────────────────────────────────────────────────────────────
 
+class RecipientCreateRequest(BaseModel):
+    name: str
+    phone_number: Optional[str] = None
+    email: Optional[str] = None
+    language: str = "hin"
+    tags: List[str] = Field(default_factory=list)
+
+
+class RecipientUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    phone_number: Optional[str] = None
+    email: Optional[str] = None
+    language: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
 class LaunchDistributionRequest(BaseModel):
     title: str
     content: str
@@ -437,6 +453,9 @@ class LaunchDistributionRequest(BaseModel):
     recurring_frequency: str = "none"  # none, daily, weekly, monthly
     audience_size: int = 250
     campaign_id: Optional[str] = None
+    # Real recipients to send to. If provided, these take priority over
+    # audience_size (which is used only for simulated/demo audiences).
+    recipient_ids: List[str] = Field(default_factory=list)
 
 
 class FeedbackSubmitRequest(BaseModel):
@@ -449,6 +468,132 @@ class FeedbackSubmitRequest(BaseModel):
 class ChannelTestRequest(BaseModel):
     channel: str = "email"
     test_recipient: Optional[str] = None
+
+
+@router.post(
+    "/recipients",
+    tags=["milestone3", "recipients"],
+    summary="Add a Recipient (Name + Phone Number) to the Audience List",
+)
+async def create_recipient(
+    req: RecipientCreateRequest,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: Optional[User] = Depends(optional_current_user),
+):
+    if not req.phone_number and not req.email:
+        raise HTTPException(status_code=400, detail="Provide at least a phone number or an email for the recipient.")
+
+    recipient = Recipient(
+        user_id=str(current_user.id) if current_user else None,
+        name=req.name,
+        phone_number=req.phone_number,
+        email=req.email,
+        language=req.language,
+        tags=req.tags,
+    )
+    session.add(recipient)
+    await session.commit()
+    await session.refresh(recipient)
+
+    return {
+        "id": recipient.id,
+        "name": recipient.name,
+        "phone_number": recipient.phone_number,
+        "email": recipient.email,
+        "language": recipient.language,
+        "tags": recipient.tags,
+        "created_at": recipient.created_at.isoformat() if recipient.created_at else None,
+    }
+
+
+@router.get(
+    "/recipients",
+    tags=["milestone3", "recipients"],
+    summary="List Saved Recipients",
+)
+async def list_recipients(
+    session: AsyncSession = Depends(get_async_session),
+    current_user: Optional[User] = Depends(optional_current_user),
+):
+    query = select(Recipient)
+    if current_user:
+        query = query.where(Recipient.user_id == str(current_user.id))
+    query = query.order_by(Recipient.created_at.desc())
+    result = await session.execute(query)
+    recipients = result.scalars().all()
+
+    return {
+        "total": len(recipients),
+        "recipients": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "phone_number": r.phone_number,
+                "email": r.email,
+                "language": r.language,
+                "tags": r.tags,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in recipients
+        ],
+    }
+
+
+@router.put(
+    "/recipients/{recipient_id}",
+    tags=["milestone3", "recipients"],
+    summary="Update a Recipient's Name / Phone Number",
+)
+async def update_recipient(
+    recipient_id: str,
+    req: RecipientUpdateRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
+    result = await session.execute(select(Recipient).where(Recipient.id == recipient_id))
+    recipient = result.scalar_one_or_none()
+    if not recipient:
+        raise HTTPException(status_code=404, detail="Recipient not found.")
+
+    if req.name is not None:
+        recipient.name = req.name
+    if req.phone_number is not None:
+        recipient.phone_number = req.phone_number
+    if req.email is not None:
+        recipient.email = req.email
+    if req.language is not None:
+        recipient.language = req.language
+    if req.tags is not None:
+        recipient.tags = req.tags
+
+    await session.commit()
+    await session.refresh(recipient)
+
+    return {
+        "id": recipient.id,
+        "name": recipient.name,
+        "phone_number": recipient.phone_number,
+        "email": recipient.email,
+        "language": recipient.language,
+        "tags": recipient.tags,
+    }
+
+
+@router.delete(
+    "/recipients/{recipient_id}",
+    tags=["milestone3", "recipients"],
+    summary="Remove a Recipient from the Audience List",
+)
+async def delete_recipient(
+    recipient_id: str,
+    session: AsyncSession = Depends(get_async_session),
+):
+    result = await session.execute(select(Recipient).where(Recipient.id == recipient_id))
+    recipient = result.scalar_one_or_none()
+    if not recipient:
+        raise HTTPException(status_code=404, detail="Recipient not found.")
+    await session.delete(recipient)
+    await session.commit()
+    return {"status": "deleted", "id": recipient_id}
 
 
 @router.post(
@@ -486,6 +631,14 @@ async def launch_distribution_job(
     3. Automated Distribution (Dispatch through selected channels)
     4. Real-time Delivery Tracking (Sent, Delivered, Failed, Pending, Retrying)
     """
+    real_recipients: List[tuple] = []
+    if req.recipient_ids:
+        rec_result = await session.execute(
+            select(Recipient).where(Recipient.id.in_(req.recipient_ids))
+        )
+        for r in rec_result.scalars().all():
+            real_recipients.append((r.name, r.email or "", r.phone_number or ""))
+
     job = await distribution_service.launch_distribution(
         session=session,
         title=req.title,
@@ -495,9 +648,10 @@ async def launch_distribution_job(
         schedule_type=req.schedule_type,
         scheduled_at=req.scheduled_at,
         recurring_frequency=req.recurring_frequency,
-        audience_size=req.audience_size,
+        audience_size=len(real_recipients) if real_recipients else req.audience_size,
         campaign_id=req.campaign_id,
         user_id=str(current_user.id) if current_user else None,
+        recipients=real_recipients or None,
     )
 
     return {
