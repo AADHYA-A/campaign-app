@@ -243,6 +243,25 @@ export interface LaunchDistributionRequest {
   recurring_frequency?: string;
   audience_size?: number;
   campaign_id?: string | null;
+  recipient_ids?: string[];
+}
+
+export interface Recipient {
+  id: string;
+  name: string;
+  phone_number?: string | null;
+  email?: string | null;
+  language: string;
+  tags: string[];
+  created_at?: string;
+}
+
+export interface RecipientCreateRequest {
+  name: string;
+  phone_number?: string;
+  email?: string;
+  language?: string;
+  tags?: string[];
 }
 
 export interface DeliveryLog {
@@ -416,6 +435,31 @@ export interface ChannelTestResult {
   verified_at: string;
   message: string;
 }
+
+// ── Recipients / Audience list ────────────────────────────────────────────────
+export const addRecipient = async (
+  data: RecipientCreateRequest
+): Promise<Recipient> => {
+  const response = await api.post("/recipients", data);
+  return response.data;
+};
+
+export const getRecipients = async (): Promise<{ total: number; recipients: Recipient[] }> => {
+  const response = await api.get("/recipients");
+  return response.data;
+};
+
+export const updateRecipient = async (
+  recipientId: string,
+  data: Partial<RecipientCreateRequest>
+): Promise<Recipient> => {
+  const response = await api.put(`/recipients/${recipientId}`, data);
+  return response.data;
+};
+
+export const deleteRecipient = async (recipientId: string): Promise<void> => {
+  await api.delete(`/recipients/${recipientId}`);
+};
 
 export const testChannel = async (
   channel: string,
