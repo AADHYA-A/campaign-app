@@ -116,7 +116,11 @@ class DistributionService:
         audience_size: int = 250,
         campaign_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        recipients: Optional[List[tuple]] = None,
     ) -> DistributionJob:
+        # If real recipients (name, email, phone) were provided, use them for
+        # the per-recipient delivery logs instead of the simulated sample list.
+        recipient_pool = recipients if recipients else SAMPLE_NAMES
         if not channels:
             channels = ["email", "sms", "whatsapp"]
 
@@ -215,17 +219,21 @@ class DistributionService:
         log_records: List[DeliveryLog] = []
         feedback_records: List[AudienceFeedback] = []
 
-        for i, (name, email, phone) in enumerate(SAMPLE_NAMES):
+        for i, (name, email, phone) in enumerate(recipient_pool):
             ch = channels[i % len(channels)]
             cfg = CHANNEL_CONFIGS[ch]
-            recipient_id = email if ch == "email" else phone if ch in ("sms", "whatsapp") else f"device_token_{i+100}"
+            recipient_id = (
+                email if ch == "email" and email
+                else phone if ch in ("sms", "whatsapp") and phone
+                else email or phone or f"device_token_{i+100}"
+            )
 
             # Make majority delivered, 1 failed, 1 retrying
-            if i == 4:
+            if i == 4 and len(recipient_pool) > 4:
                 status = "failed"
                 reason = "Carrier Network Timeout (Error 408) - Gateway unreachable"
                 retries = 2
-            elif i == 8:
+            elif i == 8 and len(recipient_pool) > 8:
                 status = "retrying"
                 reason = "Temporary throttling rate limit exceeded - Auto re-queueing"
                 retries = 1
