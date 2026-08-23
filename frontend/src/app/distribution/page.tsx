@@ -57,11 +57,15 @@ import {
   getDistributionFeedback,
   submitAudienceFeedback,
   testChannel,
+  addRecipient,
+  getRecipients,
+  deleteRecipient,
   DistributionJob,
   DeliveryLog,
   AudienceFeedbackItem,
   LaunchDistributionRequest,
   ChannelTestResult,
+  Recipient,
 } from "@/services/api";
 
 interface ChannelConfigItem {
@@ -208,6 +212,17 @@ export default function DistributionPage() {
   const [priority, setPriority] = useState("High (Health Priority)");
   const [audienceSize, setAudienceSize] = useState(10000);
   const [audienceSegment, setAudienceSegment] = useState("all");
+
+  // Recipients (real audience: name + phone number) state
+  const [audienceMode, setAudienceMode] = useState<"simulated" | "recipients">("simulated");
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
+  const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
+  const [recipientError, setRecipientError] = useState<string | null>(null);
+  const [newRecipientName, setNewRecipientName] = useState("");
+  const [newRecipientPhone, setNewRecipientPhone] = useState("");
+  const [newRecipientEmail, setNewRecipientEmail] = useState("");
+  const [isAddingRecipient, setIsAddingRecipient] = useState(false);
   const [campaignContent, setCampaignContent] = useState(
     "डेंगू से बचाव के लिए अपने आसपास पानी जमा न होने दें। मच्छरदानी का प्रयोग करें और बुखार होने पर तुरंत नजदीकी स्वास्थ्य केंद्र से संपर्क करें। स्वास्थ्य विभाग द्वारा जनहित में जारी।"
   );
@@ -342,6 +357,7 @@ export default function DistributionPage() {
   // Load jobs and mock delivery logs on mount
   useEffect(() => {
     loadJobs();
+    loadRecipients();
   }, []);
 
   const showToast = (msg: string) => {
@@ -362,6 +378,87 @@ export default function DistributionPage() {
       console.warn("Backend not active, running with interactive client simulation:", err);
       generateDefaultLogs();
     }
+  };
+
+  // ── Recipients (real audience: name + phone number) ─────────────────────────
+  const loadRecipients = async () => {
+    setIsLoadingRecipients(true);
+    try {
+      const res = await getRecipients();
+      setRecipients(res.recipients);
+      setSelectedRecipientIds(res.recipients.map((r) => r.id));
+    } catch (err) {
+      console.warn("Could not load saved recipients:", err);
+    } finally {
+      setIsLoadingRecipients(false);
+    }
+  };
+
+  const handleAddRecipient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecipientError(null);
+
+    if (!newRecipientName.trim()) {
+      setRecipientError("Please enter the recipient's name.");
+      return;
+    }
+    if (!newRecipientPhone.trim() && !newRecipientEmail.trim()) {
+      setRecipientError("Please enter a phone number or an email address.");
+      return;
+    }
+
+    setIsAddingRecipient(true);
+    try {
+      const created = await addRecipient({
+        name: newRecipientName.trim(),
+        phone_number: newRecipientPhone.trim() || undefined,
+        email: newRecipientEmail.trim() || undefined,
+        language: broadcastLanguage,
+      });
+      setRecipients((prev) => [created, ...prev]);
+      setSelectedRecipientIds((prev) => [created.id, ...prev]);
+      setNewRecipientName("");
+      setNewRecipientPhone("");
+      setNewRecipientEmail("");
+      showToast(`Added ${created.name} to your recipients list.`);
+    } catch (err) {
+      // Offline / no-backend fallback so the form still works in the UI
+      const fallback: Recipient = {
+        id: `local-${Date.now()}`,
+        name: newRecipientName.trim(),
+        phone_number: newRecipientPhone.trim() || null,
+        email: newRecipientEmail.trim() || null,
+        language: broadcastLanguage,
+        tags: [],
+        created_at: new Date().toISOString(),
+      };
+      setRecipients((prev) => [fallback, ...prev]);
+      setSelectedRecipientIds((prev) => [fallback.id, ...prev]);
+      setNewRecipientName("");
+      setNewRecipientPhone("");
+      setNewRecipientEmail("");
+      showToast(`Added ${fallback.name} to your recipients list.`);
+    } finally {
+      setIsAddingRecipient(false);
+    }
+  };
+
+  const handleDeleteRecipient = async (id: string) => {
+    setRecipients((prev) => prev.filter((r) => r.id !== id));
+    setSelectedRecipientIds((prev) => prev.filter((rid) => rid !== id));
+    if (!id.startsWith("local-")) {
+      try {
+        await deleteRecipient(id);
+      } catch (err) {
+        console.warn("Could not delete recipient from server:", err);
+      }
+    }
+  };
+
+  const toggleSelectRecipient = (id: string) => {
+    setSelectedRecipientIds((prev) =>
+      prev.includes(id) ? prev.filter((rid) => rid !== id) : [...prev, id]
+    );
   };
 
   const generateDefaultLogs = () => {
@@ -523,6 +620,13 @@ export default function DistributionPage() {
       alert("Please select at least one channel.");
       return;
     }
+    if (audienceMode === "recipients" && selectedRecipientIds.length === 0) {
+      alert("Please add or select at least one recipient (name + phone number), or switch to Simulated Audience.");
+      return;
+    }
+
+    const effectiveAudienceSize =
+      audienceMode === "recipients" ? selectedRecipientIds.length : audienceSize;
 
     setIsLaunching(true);
     try {
@@ -534,7 +638,8 @@ export default function DistributionPage() {
         schedule_type: frequency === "One Time" ? "scheduled" : "recurring",
         scheduled_at: `${campaignDate}T${campaignTime}`,
         recurring_frequency: frequency.toLowerCase(),
-        audience_size: audienceSize,
+        audience_size: effectiveAudienceSize,
+        recipient_ids: audienceMode === "recipients" ? selectedRecipientIds : [],
       };
 
       const job = await launchDistribution(req);
@@ -555,15 +660,15 @@ export default function DistributionPage() {
         scheduled_at: `${campaignDate}T${campaignTime}`,
         recurring_frequency: frequency.toLowerCase(),
         status: "completed",
-        total_recipients: audienceSize,
-        sent_count: audienceSize,
-        delivered_count: Math.round(audienceSize * 0.95),
-        failed_count: Math.round(audienceSize * 0.03),
-        retrying_count: Math.round(audienceSize * 0.005),
-        pending_count: Math.round(audienceSize * 0.015),
-        open_count: Math.round(audienceSize * 0.85),
-        click_count: Math.round(audienceSize * 0.32),
-        response_count: Math.round(audienceSize * 0.11),
+        total_recipients: effectiveAudienceSize,
+        sent_count: effectiveAudienceSize,
+        delivered_count: Math.round(effectiveAudienceSize * 0.95),
+        failed_count: Math.round(effectiveAudienceSize * 0.03),
+        retrying_count: Math.round(effectiveAudienceSize * 0.005),
+        pending_count: Math.round(effectiveAudienceSize * 0.015),
+        open_count: Math.round(effectiveAudienceSize * 0.85),
+        click_count: Math.round(effectiveAudienceSize * 0.32),
+        response_count: Math.round(effectiveAudienceSize * 0.11),
         created_at: new Date().toISOString(),
       };
       setCurrentJob(mockJob);
@@ -1603,23 +1708,210 @@ export default function DistributionPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#1e293b" }}>Target Audience Reach</span>
                     <span style={{ color: "#059669", fontWeight: 800, fontSize: "0.95rem" }}>
-                      {audienceSize.toLocaleString()} Recipients
+                      {audienceMode === "simulated"
+                        ? `${audienceSize.toLocaleString()} Recipients`
+                        : `${selectedRecipientIds.length.toLocaleString()} Recipients`}
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min={100}
-                    max={10000}
-                    step={100}
-                    value={audienceSize}
-                    onChange={(e) => setAudienceSize(Number(e.target.value))}
-                    style={{ width: "100%", accentColor: "#10b981" }}
-                  />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#94a3b8" }}>
-                    <span>100 (Pilot)</span>
-                    <span>5,000 (District)</span>
-                    <span>10,000 (National)</span>
+
+                  {/* Mode toggle: Simulated audience size vs. real Name + Phone recipients */}
+                  <div style={{ display: "flex", gap: "0.4rem", background: "#eef2f7", borderRadius: 10, padding: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => setAudienceMode("simulated")}
+                      style={{
+                        flex: 1,
+                        padding: "0.4rem 0.6rem",
+                        borderRadius: 8,
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        background: audienceMode === "simulated" ? "#fff" : "transparent",
+                        color: audienceMode === "simulated" ? "#059669" : "#64748b",
+                        boxShadow: audienceMode === "simulated" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                      }}
+                    >
+                      Simulated Audience Size
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAudienceMode("recipients")}
+                      style={{
+                        flex: 1,
+                        padding: "0.4rem 0.6rem",
+                        borderRadius: 8,
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        background: audienceMode === "recipients" ? "#fff" : "transparent",
+                        color: audienceMode === "recipients" ? "#059669" : "#64748b",
+                        boxShadow: audienceMode === "recipients" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                      }}
+                    >
+                      My Recipients (Name + Phone)
+                    </button>
                   </div>
+
+                  {audienceMode === "simulated" ? (
+                    <>
+                      <input
+                        type="range"
+                        min={100}
+                        max={10000}
+                        step={100}
+                        value={audienceSize}
+                        onChange={(e) => setAudienceSize(Number(e.target.value))}
+                        style={{ width: "100%", accentColor: "#10b981" }}
+                      />
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "#94a3b8" }}>
+                        <span>100 (Pilot)</span>
+                        <span>5,000 (District)</span>
+                        <span>10,000 (National)</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                      {/* Add recipient form */}
+                      <form
+                        onSubmit={handleAddRecipient}
+                        style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}
+                      >
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                          <input
+                            type="text"
+                            placeholder="Recipient name"
+                            value={newRecipientName}
+                            onChange={(e) => setNewRecipientName(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: "0.5rem 0.6rem",
+                              borderRadius: 8,
+                              border: "1px solid #cbd5e1",
+                              fontSize: "0.78rem",
+                            }}
+                          />
+                          <input
+                            type="tel"
+                            placeholder="Phone number"
+                            value={newRecipientPhone}
+                            onChange={(e) => setNewRecipientPhone(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: "0.5rem 0.6rem",
+                              borderRadius: 8,
+                              border: "1px solid #cbd5e1",
+                              fontSize: "0.78rem",
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                          <input
+                            type="email"
+                            placeholder="Email (optional)"
+                            value={newRecipientEmail}
+                            onChange={(e) => setNewRecipientEmail(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: "0.5rem 0.6rem",
+                              borderRadius: 8,
+                              border: "1px solid #cbd5e1",
+                              fontSize: "0.78rem",
+                            }}
+                          />
+                          <button
+                            type="submit"
+                            disabled={isAddingRecipient}
+                            className="micro-hover"
+                            style={{
+                              padding: "0.5rem 0.9rem",
+                              borderRadius: 8,
+                              border: "none",
+                              background: "#10b981",
+                              color: "#fff",
+                              fontSize: "0.78rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {isAddingRecipient ? "Adding..." : "+ Add"}
+                          </button>
+                        </div>
+                        {recipientError && (
+                          <span style={{ color: "#dc2626", fontSize: "0.72rem" }}>{recipientError}</span>
+                        )}
+                      </form>
+
+                      {/* Recipients list */}
+                      <div
+                        style={{
+                          maxHeight: 220,
+                          overflowY: "auto",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.3rem",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 10,
+                          background: "#fff",
+                          padding: recipients.length ? "0.4rem" : "0.75rem",
+                        }}
+                      >
+                        {isLoadingRecipients ? (
+                          <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Loading recipients...</span>
+                        ) : recipients.length === 0 ? (
+                          <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                            No recipients yet. Add a name and phone number above.
+                          </span>
+                        ) : (
+                          recipients.map((r) => (
+                            <div
+                              key={r.id}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: "0.5rem",
+                                padding: "0.4rem 0.5rem",
+                                borderRadius: 8,
+                                background: selectedRecipientIds.includes(r.id) ? "#ecfdf5" : "#f8fafc",
+                              }}
+                            >
+                              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", flex: 1, minWidth: 0 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedRecipientIds.includes(r.id)}
+                                  onChange={() => toggleSelectRecipient(r.id)}
+                                  style={{ accentColor: "#10b981" }}
+                                />
+                                <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                                  <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e293b" }}>{r.name}</span>
+                                  <span style={{ fontSize: "0.7rem", color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {r.phone_number || r.email || "—"}
+                                  </span>
+                                </span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRecipient(r.id)}
+                                title="Remove recipient"
+                                style={{
+                                  border: "none",
+                                  background: "transparent",
+                                  color: "#94a3b8",
+                                  cursor: "pointer",
+                                  padding: 4,
+                                }}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Queue Management Card */}
