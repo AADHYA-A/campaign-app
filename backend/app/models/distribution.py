@@ -8,6 +8,26 @@ except ImportError:
 from app.models.base import Base
 
 
+class Recipient(Base):
+    """
+    A saved contact in the user's audience list — real name + phone number
+    (optionally email) that campaigns can be sent to.
+    """
+    __tablename__ = "recipients"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    name = Column(String(255), nullable=False)
+    phone_number = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+    language = Column(String(50), default="hin")
+    tags = Column(JSON, nullable=True, default=list)  # e.g. ["volunteer", "ward-4"]
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
 class DistributionJob(Base):
     """
     Represents a multi-channel campaign distribution execution or schedule.
