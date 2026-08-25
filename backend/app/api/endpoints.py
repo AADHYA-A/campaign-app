@@ -1073,13 +1073,23 @@ async def manager_tasks(
 ):
     """
     Returns the manager's task summary:
-    - Campaigns to review / distribute
+    - Campaigns created by users assigned to this manager (or unassigned/anonymous)
     - Active distribution jobs
     - Team users under management
     Manager can: send notifications, launch distributions, view analytics.
     """
-    # Campaigns visible to this manager
-    camp_query = select(Campaign).order_by(Campaign.created_at.desc()).limit(20)
+    # Campaigns visible to this manager (created by users managed by this manager, anonymous, or unassigned)
+    camp_query = (
+        select(Campaign)
+        .outerjoin(User, Campaign.user_id == User.id)
+        .where(
+            (User.manager_id == str(current_user.id)) | 
+            (Campaign.user_id == None) | 
+            (User.manager_id == None)
+        )
+        .order_by(Campaign.created_at.desc())
+        .limit(20)
+    )
     camp_result = await session.execute(camp_query)
     campaigns = camp_result.scalars().all()
 
@@ -1151,6 +1161,65 @@ async def manager_tasks(
             "Manage recipients",
         ],
     }
+
+
+@router.get(
+    "/admin/manager/tasks",
+    tags=["admin", "tasks"],
+    summary="Admin view to manage manager tasks (admin only)",
+)
+async def admin_manage_manager_tasks(
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(_require_admin),
+):
+    """
+    Returns manager task management data:
+    - List of all registered managers and their details
+    - Distribution tasks launched by managers
+    Admin can oversee managers and audit their campaign tasks.
+    """
+    # Fetch all managers
+    managers_res = await session.execute(
+        select(User).where(User.role == "manager").order_by(User.email)
+    )
+    managers = managers_res.scalars().all()
+
+    # Fetch all distribution jobs launched by managers
+    jobs_res = await session.execute(
+        select(DistributionJob, User)
+        .join(User, DistributionJob.user_id == User.id)
+        .where(User.role == "manager")
+        .order_by(DistributionJob.created_at.desc())
+        .limit(30)
+    )
+    manager_jobs = jobs_res.all()
+
+    return {
+        "managers": [
+            {
+                "id": str(m.id),
+                "name": m.full_name,
+                "email": m.email,
+                "department": getattr(m, "department", None),
+                "is_active": m.is_active,
+            }
+            for m in managers
+        ],
+        "manager_tasks": [
+            {
+                "id": j.id,
+                "title": j.title,
+                "manager_name": u.full_name,
+                "manager_email": u.email,
+                "status": j.status,
+                "total_recipients": j.total_recipients,
+                "channels": j.channels,
+                "created_at": j.created_at.isoformat() if j.created_at else None,
+            }
+            for j, u in manager_jobs
+        ]
+    }
+
 
 
 @router.get(

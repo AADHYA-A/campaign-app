@@ -156,3 +156,18 @@ export async function getUserTasks() {
 
   return resp.json();
 }
+
+// ── Admin: Manage Manager Tasks ────────────────────────────────────────────────
+
+export async function getAdminManagerTasks() {
+  const resp = await fetch(`${API_BASE}/admin/manager/tasks`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.detail || `Admin manager tasks error ${resp.status}`);
+  }
+
+  return resp.json();
+}

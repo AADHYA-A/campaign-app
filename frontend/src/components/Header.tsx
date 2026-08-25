@@ -24,30 +24,25 @@ import { useAuth } from "@/context/AuthContext";
 
 const adminNavLinks = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin", label: "Admin Panel", icon: Shield },
-  { href: "/manager", label: "Manager", icon: Zap },
-  { href: "/distribution", label: "Distribution", icon: Send },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
-  { href: "/history", label: "History", icon: History },
+  { href: "/admin/manager-tasks", label: "Manager Tasks", icon: Zap },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 const managerNavLinks = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/manager", label: "My Tasks", icon: Zap },
+  { href: "/manager", label: "User Tasks", icon: Zap },
   { href: "/distribution", label: "Distribution", icon: Send },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
-  { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 const userNavLinks = [
   { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
+  { href: "/distribution", label: "Distribution", icon: Send },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
