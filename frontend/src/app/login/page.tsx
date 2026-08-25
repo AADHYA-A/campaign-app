@@ -16,6 +16,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -25,12 +27,16 @@ export default function LoginPage() {
         setEmail("admin@campaigns.hub");
         setPassword("admin123");
       }
+      if (params.get("session") === "expired") {
+        setSessionExpired(true);
+      }
     }
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSessionExpired(false);
     setLoading(true);
     try {
       await login(email, password);
@@ -45,6 +51,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
 
   return (
     <div
@@ -107,6 +114,28 @@ export default function LoginPage() {
               Sign in to your Campaigns Hub account
             </p>
           </div>
+
+          {/* Session expired banner */}
+          {sessionExpired && (
+            <div
+              className="animate-slide-down"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+                padding: "0.85rem 1rem",
+                borderRadius: "var(--radius-md)",
+                background: "rgba(245, 158, 11, 0.08)",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
+                color: "#f59e0b",
+                fontSize: "0.85rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              Your session has expired. Please log in again.
+            </div>
+          )}
 
           {/* Error alert */}
           {error && (
