@@ -33,8 +33,6 @@ import {
   Loader2,
 } from "lucide-react";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 interface NotifyResult {
   success: boolean;
   simulated?: boolean;
@@ -42,6 +40,7 @@ interface NotifyResult {
   error?: string;
   message_id?: string;
   provider?: string;
+  response?: string;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
