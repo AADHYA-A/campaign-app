@@ -172,6 +172,11 @@ async def generate_campaign(
     session: AsyncSession = Depends(get_async_session),
     current_user: Optional[User] = Depends(optional_current_user),
 ):
+    if current_user and (getattr(current_user, "role", "user") == "admin" or current_user.is_superuser):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin accounts are not allowed to create campaigns. Please use a manager or user account.",
+        )
     content = await llm_service.generate_campaign_content(topic=req.topic, tone=req.tone)
     sentiment = await llm_service.analyze_sentiment(content)
     translated = indic_translation.translate(
@@ -263,6 +268,11 @@ async def generate_full_pipeline(
     4. Sentiment & Tone Optimisation
     5. AI Quality & Compliance Check
     """
+    if current_user and (getattr(current_user, "role", "user") == "admin" or current_user.is_superuser):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin accounts are not allowed to create campaigns. Please use a manager or user account.",
+        )
     result = await content_service.run_full_pipeline(
         topic=req.topic,
         tone=req.tone,

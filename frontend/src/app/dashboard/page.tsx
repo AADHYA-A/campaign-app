@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import {
   AreaChart,
   Area,
@@ -284,6 +286,9 @@ function QCPanel({ qc }: { qc: FullPipelineResponse["quality_check"] }) {
 }
 
 export default function DashboardPage() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("professional");
   const [targetLang, setTargetLang] = useState("hin");
@@ -297,6 +302,26 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<"original" | "personalized" | "translated">("personalized");
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Redirect guard
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push("/login");
+      } else if ((user as any)?.role === "admin" || user?.is_superuser) {
+        router.push("/admin");
+      }
+    }
+  }, [isLoading, isAuthenticated, user, router]);
+
+  if (isLoading || !isAuthenticated || (user as any)?.role === "admin" || user?.is_superuser) {
+    return (
+      <div style={{ minHeight: "calc(100vh - var(--nav-height))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Loader2 size={36} style={{ animation: "spin 1s linear infinite", color: "var(--primary)" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   const handleGenerate = async () => {
     if (!topic.trim()) return;
