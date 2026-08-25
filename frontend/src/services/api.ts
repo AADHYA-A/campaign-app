@@ -21,23 +21,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Auto-logout on 401 (token expired / invalid) ──────────────────────────
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error?.response?.status === 401 && typeof window !== "undefined") {
-      // Clear stale auth data
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem("campaigns_hub_user");
-      // Redirect to login with a message
-      if (!window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login?session=expired";
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Request / Response interfaces
 // ─────────────────────────────────────────────────────────────────────────────
