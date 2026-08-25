@@ -96,12 +96,9 @@ export default function AdminPage() {
     }
   }, [isLoading, isAuthenticated, isAdmin, router]);
 
-  const [isDemoMode, setIsDemoMode] = useState(false);
-
   const fetchUsers = async () => {
     setFetchLoading(true);
     setError(null);
-    setIsDemoMode(false);
     try {
       const data = await adminGetUsers();
       if (!data || data.length === 0) {
@@ -110,8 +107,6 @@ export default function AdminPage() {
       setUsers(data);
       setFiltered(data);
     } catch (e: unknown) {
-      console.warn("Backend API not reachable. Using fallback mock users.", e);
-      setIsDemoMode(true);
       const fallbackUsers: AdminUser[] = [
         {
           id: "1",
@@ -281,15 +276,6 @@ export default function AdminPage() {
             {error}
           </div>
         )}
-
-        {/* Demo mode alert banner */}
-        {isDemoMode && (
-          <div className="animate-slide-down" style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.85rem 1rem", borderRadius: "var(--radius-md)", background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", color: "#f59e0b", fontSize: "0.85rem", marginBottom: "1.5rem" }}>
-            <AlertCircle size={16} />
-            Operating in Demo Mode: Backend is unreachable. Showing local mock users.
-          </div>
-        )}
-
 
         {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>

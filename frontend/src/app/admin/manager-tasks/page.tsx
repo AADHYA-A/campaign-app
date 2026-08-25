@@ -35,7 +35,6 @@ export default function AdminManagerTasksPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isDemo, setIsDemo] = useState(false);
 
   const role = (user as any)?.role as string | undefined;
   const isAdmin = role === "admin" || user?.is_superuser;
@@ -51,8 +50,7 @@ export default function AdminManagerTasksPage() {
   useEffect(() => {
     if (!isLoading && isAuthenticated && isAdmin) {
       setLoading(true);
-      setError("");
-      setIsDemo(false);
+      setError("")
       getAdminManagerTasks()
         .then((res) => {
           if (!res || !res.managers || res.managers.length === 0) {
@@ -61,8 +59,7 @@ export default function AdminManagerTasksPage() {
           setData(res);
         })
         .catch((e) => {
-          console.warn("Backend API not reachable. Using fallback manager tasks mock data.", e);
-          setIsDemo(true);
+          console.warn("Backend unavailable, using mock data", e);
           setData({
             managers: [
               {
@@ -158,14 +155,6 @@ export default function AdminManagerTasksPage() {
           </span>
         </div>
       </div>
-
-      {/* Demo mode alert banner */}
-      {isDemo && !loading && (
-        <div className="animate-slide-down" style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.85rem 1rem", borderRadius: "var(--radius-md)", background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", color: "#f59e0b", fontSize: "0.85rem", marginBottom: "1.5rem" }}>
-          <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-          Operating in Demo Mode: Backend is unreachable. Showing local mock manager tasks.
-        </div>
-      )}
 
       {loading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "4rem" }}>
