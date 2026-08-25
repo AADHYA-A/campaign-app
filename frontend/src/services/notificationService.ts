@@ -5,7 +5,8 @@
  * WhatsApp: CallMeBot (free, no Meta account) — requires recipient activation + CALLMEBOT_DEFAULT_APIKEY
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const isProduction = process.env.NODE_ENV === "production";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || (isProduction ? "/api/backend" : "http://localhost:8000/api/backend");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,12 +57,13 @@ export interface BulkNotifyResult {
 
 function getAuthHeaders(): HeadersInit {
   if (typeof window === "undefined") return { "Content-Type": "application/json" };
-  const token = localStorage.getItem("access_token");
+  const token = localStorage.getItem("campaigns_hub_token");
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
+
 
 // ── Email — Resend ────────────────────────────────────────────────────────────
 
