@@ -19,6 +19,19 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-1.5-flash"
 
+    # ── Email — Resend (free tier: 3,000 emails/month) ───────────────────────
+    # Sign up free at: https://resend.com
+    # Use "onboarding@resend.dev" as FROM for testing (no domain needed)
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "onboarding@resend.dev"
+    RESEND_FROM_NAME: str = "Campaign Hub"
+
+    # ── WhatsApp — CallMeBot (completely free, no Meta account needed) ────────
+    # Each recipient activates by messaging +34 644 81 31 64 "I allow callmebot to send me messages"
+    # Docs: https://www.callmebot.com/blog/free-api-whatsapp-messages/
+    CALLMEBOT_DEFAULT_PHONE: str = ""
+    CALLMEBOT_DEFAULT_APIKEY: str = ""
+
     class Config:
         env_file = ".env"
 

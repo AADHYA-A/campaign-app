@@ -22,15 +22,37 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-const authNavLinks = [
+const adminNavLinks = [
   { href: "/", label: "Home", icon: Home },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin", label: "Admin Panel", icon: Shield },
+  { href: "/manager", label: "Manager", icon: Zap },
   { href: "/distribution", label: "Distribution", icon: Send },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+const managerNavLinks = [
+  { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/manager", label: "My Tasks", icon: Zap },
+  { href: "/distribution", label: "Distribution", icon: Send },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
+  { href: "/history", label: "History", icon: History },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
+const userNavLinks = [
+  { href: "/", label: "Home", icon: Home },
+  { href: "/campaigns", label: "Campaigns", icon: MessageSquare },
+  { href: "/history", label: "History", icon: History },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
+const authNavLinks = userNavLinks; // fallback
 
 const publicNavLinks = [
   { href: "/", label: "Home", icon: Home },
@@ -102,6 +124,23 @@ export default function Header() {
 
   const isAdmin =
     user?.is_superuser || (user as unknown as { role?: string })?.role === "admin";
+  const isManager = (user as unknown as { role?: string })?.role === "manager";
+
+  // Choose nav links based on role
+  const roleNavLinks = isAdmin
+    ? adminNavLinks
+    : isManager
+    ? managerNavLinks
+    : isAuthenticated
+    ? userNavLinks
+    : publicNavLinks;
+
+  // Role badge config
+  const roleBadge = isAdmin
+    ? { label: "Admin", color: "#7c3aed", bg: "rgba(124,58,237,0.12)", border: "rgba(124,58,237,0.3)" }
+    : isManager
+    ? { label: "Manager", color: "#0891b2", bg: "rgba(8,145,178,0.12)", border: "rgba(8,145,178,0.3)" }
+    : null;
 
   return (
     <>
@@ -177,7 +216,7 @@ export default function Header() {
               style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
               className="desktop-nav"
             >
-              {authNavLinks.map(({ href, label, icon: Icon }) => {
+              {roleNavLinks.map(({ href, label, icon: Icon }) => {
                 const isActive = pathname === href;
                 return (
                   <Link
@@ -238,9 +277,27 @@ export default function Header() {
                       className="desktop-nav"
                     >
                       <AvatarBadge name={user.full_name} email={user.email} />
-                      <span style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--foreground)" }}>
-                        Hi, {(user.full_name || user.email.split("@")[0]).split(" ")[0]}!
-                      </span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                        <span style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--foreground)" }}>
+                          Hi, {(user.full_name || user.email.split("@")[0]).split(" ")[0]}!
+                        </span>
+                        {roleBadge && (
+                          <span style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            color: roleBadge.color,
+                            background: roleBadge.bg,
+                            border: `1px solid ${roleBadge.border}`,
+                            borderRadius: 4,
+                            padding: "0 5px",
+                            lineHeight: "1.4",
+                            letterSpacing: "0.05em",
+                            textTransform: "uppercase",
+                          }}>
+                            {roleBadge.label}
+                          </span>
+                        )}
+                      </div>
                     </Link>
 
                     {/* Logout */}
@@ -306,7 +363,7 @@ export default function Header() {
           >
             {isAuthenticated ? (
               <>
-                {authNavLinks.map(({ href, label, icon: Icon }) => {
+                {roleNavLinks.map(({ href, label, icon: Icon }) => {
                   const isActive = pathname === href;
                   return (
                     <Link

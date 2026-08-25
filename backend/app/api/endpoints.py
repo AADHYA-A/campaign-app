@@ -1,6 +1,7 @@
 """
 endpoints.py — Campaign & Content API routes
 Milestone 2: AI Content Generation & Multilingual Communication Engine
+Milestone 3: Distribution, Analytics, Notification APIs (Email + WhatsApp)
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,7 @@ from app.services.content_service import content_service
 from app.services.distribution_service import distribution_service
 from app.services.analytics_engine import analytics_engine
 from app.services.feedback_service import feedback_service
+from app.services.notification_service import notification_service
 from app.core.database import get_async_session
 from app.core.users import optional_current_user, current_active_user
 from app.models.campaign import Campaign
@@ -116,6 +118,9 @@ class AdminUserResponse(BaseModel):
     full_name: Optional[str] = None
     organization: Optional[str] = None
     preferred_language: Optional[str] = None
+    department: Optional[str] = None
+    manager_id: Optional[str] = None
+    # Role: "user" | "manager" | "admin"
     role: Optional[str] = "user"
     is_active: bool
     is_superuser: bool
@@ -126,11 +131,35 @@ class AdminUserResponse(BaseModel):
 
 
 class AdminUserUpdate(BaseModel):
-    role: Optional[str] = None
+    role: Optional[str] = None          # "user" | "manager" | "admin"
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
     full_name: Optional[str] = None
     organization: Optional[str] = None
+    department: Optional[str] = None
+    manager_id: Optional[str] = None    # Assign a manager to this user
+
+
+# ─── Notification request models ─────────────────────────────────────────────
+
+class SendEmailRequest(BaseModel):
+    to: str
+    subject: str
+    html_body: str
+    text_body: Optional[str] = None
+
+
+class SendWhatsAppRequest(BaseModel):
+    phone: str
+    message: str
+    apikey: Optional[str] = None  # Recipient's CallMeBot API key (optional)
+
+
+class BulkNotifyRequest(BaseModel):
+    recipient_ids: List[str]
+    campaign_title: str
+    campaign_content: str
+    channels: List[str] = Field(default=["email", "whatsapp"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -314,15 +343,30 @@ async def quality_check(req: QualityCheckRequest):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Admin: User Management (superuser-only)
+# Role-based access dependencies
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Role hierarchy: admin > manager > user
+_ROLE_LEVEL = {"user": 0, "manager": 1, "admin": 2}
+
 
 async def _require_admin(current_user: User = Depends(current_active_user)) -> User:
     """Dependency: ensures the caller is a superuser or has role=admin."""
     if not current_user.is_superuser and getattr(current_user, "role", "user") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required.",
+            detail="Admin access required. Only admins can perform this action.",
+        )
+    return current_user
+
+
+async def _require_manager(current_user: User = Depends(current_active_user)) -> User:
+    """Dependency: ensures the caller has at minimum a manager role (or admin/superuser)."""
+    user_role = getattr(current_user, "role", "user")
+    if not current_user.is_superuser and _ROLE_LEVEL.get(user_role, 0) < _ROLE_LEVEL["manager"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manager or admin access required for this action.",
         )
     return current_user
 
@@ -337,7 +381,7 @@ async def admin_list_users(
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(_require_admin),
 ):
-    """Return all registered users. Requires admin or superuser role."""
+    """Return all registered users with their roles. Requires admin or superuser role."""
     result = await session.execute(select(User).order_by(User.email))
     users = result.scalars().all()
     return [
@@ -347,6 +391,8 @@ async def admin_list_users(
             full_name=u.full_name,
             organization=u.organization,
             preferred_language=u.preferred_language,
+            department=getattr(u, "department", None),
+            manager_id=str(u.manager_id) if getattr(u, "manager_id", None) else None,
             role=getattr(u, "role", "user"),
             is_active=u.is_active,
             is_superuser=u.is_superuser,
@@ -368,13 +414,15 @@ async def admin_update_user(
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(_require_admin),
 ):
-    """Update a user's role, active status, or superuser flag."""
+    """Update a user's role (user/manager/admin), active status, department, or manager assignment."""
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
     if update.role is not None:
+        if update.role not in ("user", "manager", "admin"):
+            raise HTTPException(status_code=400, detail="Role must be one of: user, manager, admin")
         user.role = update.role
     if update.is_active is not None:
         user.is_active = update.is_active
@@ -384,6 +432,10 @@ async def admin_update_user(
         user.full_name = update.full_name
     if update.organization is not None:
         user.organization = update.organization
+    if update.department is not None:
+        user.department = update.department
+    if update.manager_id is not None:
+        user.manager_id = update.manager_id
 
     await session.commit()
     await session.refresh(user)
@@ -394,6 +446,8 @@ async def admin_update_user(
         full_name=user.full_name,
         organization=user.organization,
         preferred_language=user.preferred_language,
+        department=getattr(user, "department", None),
+        manager_id=str(user.manager_id) if getattr(user, "manager_id", None) else None,
         role=getattr(user, "role", "user"),
         is_active=user.is_active,
         is_superuser=user.is_superuser,
@@ -902,3 +956,283 @@ async def get_analytics_overview(
     """
     result = await analytics_engine.get_platform_overview(session=session)
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Notification APIs — Email (Resend) + WhatsApp (CallMeBot)
+# Role: manager and above
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/notify/email",
+    tags=["notifications"],
+    summary="Send Email via Resend (free API — manager+ only)",
+)
+async def send_email_notification(
+    req: SendEmailRequest,
+    _: User = Depends(_require_manager),
+):
+    """
+    Send a transactional email via the Resend free API.
+    Free tier: 3,000 emails/month, 100/day.
+    Sign up at: https://resend.com
+    Set RESEND_API_KEY in your .env to activate.
+    """
+    result = await notification_service.send_email(
+        to=req.to,
+        subject=req.subject,
+        html_body=req.html_body,
+        text_body=req.text_body,
+    )
+    return result
+
+
+@router.post(
+    "/notify/whatsapp",
+    tags=["notifications"],
+    summary="Send WhatsApp message via CallMeBot (free API — manager+ only)",
+)
+async def send_whatsapp_notification(
+    req: SendWhatsAppRequest,
+    _: User = Depends(_require_manager),
+):
+    """
+    Send a WhatsApp message via the CallMeBot free API (no Meta account needed).
+    Recipients must activate once by messaging +34 644 81 31 64 on WhatsApp.
+    Set CALLMEBOT_DEFAULT_APIKEY in .env for the default API key.
+    Docs: https://www.callmebot.com/blog/free-api-whatsapp-messages/
+    """
+    result = await notification_service.send_whatsapp(
+        phone=req.phone,
+        message=req.message,
+        apikey=req.apikey,
+    )
+    return result
+
+
+@router.post(
+    "/notify/bulk",
+    tags=["notifications"],
+    summary="Bulk-notify recipients via Email + WhatsApp (manager+ only)",
+)
+async def bulk_notify_recipients(
+    req: BulkNotifyRequest,
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(_require_manager),
+):
+    """
+    Send campaign notifications to multiple saved recipients across Email and/or WhatsApp.
+    Uses the notification_service which gracefully degrades if API keys are not configured.
+    """
+    if not req.recipient_ids:
+        raise HTTPException(status_code=400, detail="Provide at least one recipient_id.")
+
+    rec_result = await session.execute(
+        select(Recipient).where(Recipient.id.in_(req.recipient_ids))
+    )
+    recipients = rec_result.scalars().all()
+    if not recipients:
+        raise HTTPException(status_code=404, detail="No matching recipients found.")
+
+    results = []
+    for r in recipients:
+        channel_results = await notification_service.send_campaign_to_recipient(
+            recipient_name=r.name,
+            email=r.email,
+            phone=r.phone_number,
+            campaign_title=req.campaign_title,
+            campaign_content=req.campaign_content,
+            channels=req.channels,
+        )
+        results.append({
+            "recipient_id": r.id,
+            "recipient_name": r.name,
+            "results": channel_results,
+        })
+
+    return {
+        "campaign_title": req.campaign_title,
+        "total_recipients": len(results),
+        "channels": req.channels,
+        "results": results,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Role-based Task Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/manager/tasks",
+    tags=["manager", "tasks"],
+    summary="Manager Task Dashboard — campaigns + distributions (manager+ only)",
+)
+async def manager_tasks(
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(_require_manager),
+):
+    """
+    Returns the manager's task summary:
+    - Campaigns to review / distribute
+    - Active distribution jobs
+    - Team users under management
+    Manager can: send notifications, launch distributions, view analytics.
+    """
+    # Campaigns visible to this manager
+    camp_query = select(Campaign).order_by(Campaign.created_at.desc()).limit(20)
+    camp_result = await session.execute(camp_query)
+    campaigns = camp_result.scalars().all()
+
+    # Active distribution jobs (pending/processing)
+    job_query = select(DistributionJob).where(
+        DistributionJob.status.in_(["pending", "processing", "scheduled"])
+    ).order_by(DistributionJob.created_at.desc()).limit(10)
+    job_result = await session.execute(job_query)
+    active_jobs = job_result.scalars().all()
+
+    # Users under this manager
+    team_query = select(User).where(User.manager_id == str(current_user.id))
+    team_result = await session.execute(team_query)
+    team = team_result.scalars().all()
+
+    return {
+        "manager": {
+            "id": str(current_user.id),
+            "name": current_user.full_name,
+            "email": current_user.email,
+            "role": getattr(current_user, "role", "manager"),
+            "department": getattr(current_user, "department", None),
+        },
+        "tasks": {
+            "review_campaigns": [
+                {
+                    "id": c.id,
+                    "topic": c.topic,
+                    "tone": c.tone,
+                    "target_language": c.target_language,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                    "action": "Distribute or notify recipients",
+                }
+                for c in campaigns
+            ],
+            "active_distributions": [
+                {
+                    "id": j.id,
+                    "title": j.title,
+                    "status": j.status,
+                    "total_recipients": j.total_recipients,
+                    "channels": j.channels,
+                    "created_at": j.created_at.isoformat() if j.created_at else None,
+                    "action": "Monitor delivery and retry failures",
+                }
+                for j in active_jobs
+            ],
+            "send_notifications": {
+                "description": "Use POST /notify/email or POST /notify/whatsapp to send messages",
+                "email_provider": "Resend (free — 3,000/month)",
+                "whatsapp_provider": "CallMeBot (free — no Meta account)",
+            },
+        },
+        "team": [
+            {
+                "id": str(u.id),
+                "name": u.full_name,
+                "email": u.email,
+                "role": getattr(u, "role", "user"),
+                "department": getattr(u, "department", None),
+            }
+            for u in team
+        ],
+        "permissions": [
+            "Send email notifications (Resend free API)",
+            "Send WhatsApp notifications (CallMeBot free API)",
+            "Launch campaign distributions",
+            "View analytics & delivery reports",
+            "Manage recipients",
+        ],
+    }
+
+
+@router.get(
+    "/user/tasks",
+    tags=["user", "tasks"],
+    summary="User Task View — own campaigns and feedback submissions",
+)
+async def user_tasks(
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user),
+):
+    """
+    Returns a regular user's task view:
+    - Own campaigns to review
+    - Campaigns to provide feedback on
+    User can: create campaigns, view own history, submit feedback.
+    """
+    # Own campaigns
+    camp_query = select(Campaign).where(
+        Campaign.user_id == str(current_user.id)
+    ).order_by(Campaign.created_at.desc()).limit(20)
+    camp_result = await session.execute(camp_query)
+    my_campaigns = camp_result.scalars().all()
+
+    # Campaigns awaiting feedback (delivered distributions)
+    dist_query = select(DistributionJob).where(
+        DistributionJob.user_id == str(current_user.id),
+        DistributionJob.status == "completed",
+    ).order_by(DistributionJob.created_at.desc()).limit(5)
+    dist_result = await session.execute(dist_query)
+    completed_distributions = dist_result.scalars().all()
+
+    # Manager info if assigned
+    manager_info = None
+    if getattr(current_user, "manager_id", None):
+        mgr_result = await session.execute(
+            select(User).where(User.id == str(current_user.manager_id))
+        )
+        manager = mgr_result.scalar_one_or_none()
+        if manager:
+            manager_info = {
+                "id": str(manager.id),
+                "name": manager.full_name,
+                "email": manager.email,
+            }
+
+    return {
+        "user": {
+            "id": str(current_user.id),
+            "name": current_user.full_name,
+            "email": current_user.email,
+            "role": getattr(current_user, "role", "user"),
+            "department": getattr(current_user, "department", None),
+        },
+        "manager": manager_info,
+        "tasks": {
+            "my_campaigns": [
+                {
+                    "id": c.id,
+                    "topic": c.topic,
+                    "tone": c.tone,
+                    "target_language": c.target_language,
+                    "sentiment": c.sentiment_label,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                    "action": "Review content and submit for distribution",
+                }
+                for c in my_campaigns
+            ],
+            "pending_feedback": [
+                {
+                    "distribution_id": d.id,
+                    "title": d.title,
+                    "completed_at": d.created_at.isoformat() if d.created_at else None,
+                    "action": f"Submit feedback at POST /distribution/{d.id}/feedback",
+                }
+                for d in completed_distributions
+            ],
+        },
+        "permissions": [
+            "Create and edit campaigns",
+            "View own campaign history",
+            "Submit feedback on distributed campaigns",
+            "Update profile settings",
+        ],
+    }

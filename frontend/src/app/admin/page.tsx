@@ -21,6 +21,7 @@ import { adminGetUsers, adminUpdateUser, adminDeleteUser, AdminUser } from "@/se
 
 const ROLE_OPTIONS = [
   { value: "user", label: "User" },
+  { value: "manager", label: "Manager" },
   { value: "admin", label: "Admin" },
 ];
 
@@ -47,6 +48,9 @@ function StatusBadge({ active }: { active: boolean }) {
 
 function RoleBadge({ role, isSuperuser }: { role?: string; isSuperuser: boolean }) {
   const isAdmin = isSuperuser || role === "admin";
+  const isManager = role === "manager";
+  const color = isAdmin ? "#d97706" : isManager ? "#0891b2" : "#4f46e5";
+  const bg = isAdmin ? "rgba(217,119,6,0.1)" : isManager ? "rgba(8,145,178,0.1)" : "rgba(79,70,229,0.1)";
   return (
     <span
       style={{
@@ -57,12 +61,12 @@ function RoleBadge({ role, isSuperuser }: { role?: string; isSuperuser: boolean 
         fontWeight: 700,
         padding: "0.2rem 0.55rem",
         borderRadius: 999,
-        background: isAdmin ? "rgba(217,119,6,0.1)" : "rgba(79,70,229,0.1)",
-        color: isAdmin ? "#d97706" : "#4f46e5",
+        background: bg,
+        color,
       }}
     >
       {isAdmin ? <Crown size={11} /> : <UserCircle size={11} />}
-      {isSuperuser ? "Superuser" : isAdmin ? "Admin" : "User"}
+      {isSuperuser ? "Superuser" : isAdmin ? "Admin" : isManager ? "Manager" : "User"}
     </span>
   );
 }

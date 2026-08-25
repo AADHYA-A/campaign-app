@@ -9,6 +9,9 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
     avatar_url: Optional[str] = None
     organization: Optional[str] = None
     preferred_language: Optional[str] = "eng"
+    department: Optional[str] = None
+    manager_id: Optional[str] = None
+    # Role: "user" | "manager" | "admin"
     role: Optional[str] = "user"
 
     class Config:
@@ -18,6 +21,7 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
 class UserCreate(schemas.BaseUserCreate):
     full_name: Optional[str] = None
     organization: Optional[str] = None
+    department: Optional[str] = None
 
 
 class UserUpdate(schemas.BaseUserUpdate):
@@ -26,4 +30,6 @@ class UserUpdate(schemas.BaseUserUpdate):
     avatar_url: Optional[str] = None
     organization: Optional[str] = None
     preferred_language: Optional[str] = None
+    department: Optional[str] = None
     role: Optional[str] = None
+    manager_id: Optional[str] = None
