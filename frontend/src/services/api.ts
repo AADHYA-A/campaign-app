@@ -148,7 +148,10 @@ export interface AdminUser {
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
+  department?: string | null;
+  manager_id?: string | null;
 }
+
 
 export interface AdminUserUpdate {
   role?: string;

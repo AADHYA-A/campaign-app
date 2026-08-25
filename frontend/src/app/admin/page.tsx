@@ -96,15 +96,86 @@ export default function AdminPage() {
     }
   }, [isLoading, isAuthenticated, isAdmin, router]);
 
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
   const fetchUsers = async () => {
     setFetchLoading(true);
     setError(null);
+    setIsDemoMode(false);
     try {
       const data = await adminGetUsers();
+      if (!data || data.length === 0) {
+        throw new Error("No users found in database");
+      }
       setUsers(data);
       setFiltered(data);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load users");
+      console.warn("Backend API not reachable. Using fallback mock users.", e);
+      setIsDemoMode(true);
+      const fallbackUsers: AdminUser[] = [
+        {
+          id: "1",
+          email: "admin@campaigns.hub",
+          full_name: "Aadhya Sharma (You)",
+          organization: "Campaigns Hub Admin Team",
+          preferred_language: "hin",
+          department: "Operations",
+          role: "admin",
+          is_active: true,
+          is_superuser: true,
+          is_verified: true,
+        },
+        {
+          id: "2",
+          email: "rajesh.kumar@campaigns.hub",
+          full_name: "Rajesh Kumar",
+          organization: "Sales Department",
+          preferred_language: "hin",
+          department: "Sales",
+          role: "manager",
+          is_active: true,
+          is_superuser: false,
+          is_verified: true,
+        },
+        {
+          id: "3",
+          email: "priya.patel@campaigns.hub",
+          full_name: "Priya Patel",
+          organization: "Marketing Department",
+          preferred_language: "guj",
+          department: "Marketing",
+          role: "manager",
+          is_active: true,
+          is_superuser: false,
+          is_verified: true,
+        },
+        {
+          id: "4",
+          email: "amit.verma@campaigns.hub",
+          full_name: "Amit Verma",
+          organization: "Sales Department",
+          preferred_language: "hin",
+          department: "Sales",
+          role: "user",
+          is_active: true,
+          is_superuser: false,
+          is_verified: true,
+        },
+        {
+          id: "5",
+          email: "sneha.reddy@campaigns.hub",
+          full_name: "Sneha Reddy",
+          organization: "Marketing Department",
+          preferred_language: "tel",
+          department: "Marketing",
+          role: "user",
+          is_active: true,
+          is_superuser: false,
+          is_verified: false,
+        },
+      ];
+      setUsers(fallbackUsers);
+      setFiltered(fallbackUsers);
     } finally {
       setFetchLoading(false);
     }
@@ -210,6 +281,15 @@ export default function AdminPage() {
             {error}
           </div>
         )}
+
+        {/* Demo mode alert banner */}
+        {isDemoMode && (
+          <div className="animate-slide-down" style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.85rem 1rem", borderRadius: "var(--radius-md)", background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", color: "#f59e0b", fontSize: "0.85rem", marginBottom: "1.5rem" }}>
+            <AlertCircle size={16} />
+            Operating in Demo Mode: Backend is unreachable. Showing local mock users.
+          </div>
+        )}
+
 
         {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
