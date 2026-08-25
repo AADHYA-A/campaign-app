@@ -477,6 +477,126 @@ async def admin_delete_user(
     await session.commit()
 
 
+# ─── Admin Campaign Management ────────────────────────────────────────────────
+
+class AdminCampaignResponse(BaseModel):
+    id: str
+    topic: str
+    tone: str
+    original_content: str
+    translated_content: Optional[str] = None
+    target_language: Optional[str] = None
+    sentiment_label: Optional[str] = None
+    status: str  # pending | approved | rejected
+    admin_note: Optional[str] = None
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class CampaignStatusUpdate(BaseModel):
+    status: str  # "approved" | "rejected"
+    admin_note: Optional[str] = None
+
+
+@router.get(
+    "/admin/campaigns",
+    response_model=List[AdminCampaignResponse],
+    tags=["admin"],
+    summary="List all campaigns (admin only)",
+)
+async def admin_list_campaigns(
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(_require_admin),
+):
+    """Return all campaigns with owner info for admin review."""
+    result = await session.execute(
+        select(Campaign).order_by(Campaign.created_at.desc())
+    )
+    campaigns = result.scalars().all()
+
+    # Fetch all relevant users in one query
+    user_ids = [str(c.user_id) for c in campaigns if c.user_id]
+    users_map: Dict[str, User] = {}
+    if user_ids:
+        user_result = await session.execute(
+            select(User).where(User.id.in_(user_ids))
+        )
+        for u in user_result.scalars().all():
+            users_map[str(u.id)] = u
+
+    return [
+        AdminCampaignResponse(
+            id=str(c.id),
+            topic=c.topic,
+            tone=c.tone,
+            original_content=c.original_content,
+            translated_content=c.translated_content,
+            target_language=c.target_language,
+            sentiment_label=c.sentiment_label,
+            status=getattr(c, "status", "pending"),
+            admin_note=getattr(c, "admin_note", None),
+            user_id=str(c.user_id) if c.user_id else None,
+            user_email=users_map[str(c.user_id)].email if c.user_id and str(c.user_id) in users_map else None,
+            user_name=users_map[str(c.user_id)].full_name if c.user_id and str(c.user_id) in users_map else None,
+            created_at=c.created_at,
+        )
+        for c in campaigns
+    ]
+
+
+@router.patch(
+    "/admin/campaigns/{campaign_id}/status",
+    response_model=AdminCampaignResponse,
+    tags=["admin"],
+    summary="Approve or reject a campaign (admin only)",
+)
+async def admin_update_campaign_status(
+    campaign_id: str,
+    update: CampaignStatusUpdate,
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(_require_admin),
+):
+    """Set a campaign status to approved or rejected with an optional admin note."""
+    if update.status not in ("approved", "rejected", "pending"):
+        raise HTTPException(status_code=400, detail="Status must be: approved, rejected, or pending")
+
+    result = await session.execute(select(Campaign).where(Campaign.id == campaign_id))
+    campaign = result.scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found.")
+
+    campaign.status = update.status
+    if update.admin_note is not None:
+        campaign.admin_note = update.admin_note
+
+    await session.commit()
+    await session.refresh(campaign)
+
+    # Fetch owner
+    owner = None
+    if campaign.user_id:
+        owner_result = await session.execute(select(User).where(User.id == campaign.user_id))
+        owner = owner_result.scalar_one_or_none()
+
+    return AdminCampaignResponse(
+        id=str(campaign.id),
+        topic=campaign.topic,
+        tone=campaign.tone,
+        original_content=campaign.original_content,
+        translated_content=campaign.translated_content,
+        target_language=campaign.target_language,
+        sentiment_label=campaign.sentiment_label,
+        status=campaign.status,
+        admin_note=campaign.admin_note,
+        user_id=str(campaign.user_id) if campaign.user_id else None,
+        user_email=owner.email if owner else None,
+        user_name=owner.full_name if owner else None,
+        created_at=campaign.created_at,
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Milestone 3: Multi-Channel Distribution & Engagement Analytics Platform
 # ─────────────────────────────────────────────────────────────────────────────

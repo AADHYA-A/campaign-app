@@ -1,0 +1,246 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import {
+  adminGetCampaigns,
+  adminUpdateCampaignStatus,
+  AdminCampaign,
+} from "@/services/api";
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  User,
+  Globe,
+  FileText,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  pending:  { label: "Pending",  color: "#f59e0b", bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.3)" },
+  approved: { label: "Approved", color: "#10b981", bg: "rgba(16,185,129,0.1)",  border: "rgba(16,185,129,0.3)" },
+  rejected: { label: "Rejected", color: "#ef4444", bg: "rgba(239,68,68,0.1)",   border: "rgba(239,68,68,0.3)" },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
+  const Icon = status === "approved" ? CheckCircle : status === "rejected" ? XCircle : Clock;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", padding: "0.25rem 0.7rem", borderRadius: 20, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color, fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+      <Icon size={13} />
+      {cfg.label}
+    </span>
+  );
+}
+
+export default function AdminCampaignsPage() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+  const isAdmin = (user as any)?.is_superuser || (user as any)?.role === "admin";
+
+  const [campaigns, setCampaigns] = useState<AdminCampaign[]>([]);
+  const [fetchLoading, setFetchLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [noteMap, setNoteMap] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !isAdmin)) router.push("/dashboard");
+  }, [isLoading, isAuthenticated, isAdmin, router]);
+
+  const fetchCampaigns = async () => {
+    setFetchLoading(true);
+    setError(null);
+    try {
+      setCampaigns(await adminGetCampaigns());
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load campaigns");
+    } finally {
+      setFetchLoading(false);
+    }
+  };
+
+  useEffect(() => { if (isAuthenticated && isAdmin) fetchCampaigns(); }, [isAuthenticated, isAdmin]);
+
+  const handleStatus = async (id: string, status: "approved" | "rejected" | "pending") => {
+    setActionLoading(id + status);
+    try {
+      const updated = await adminUpdateCampaignStatus(id, status, noteMap[id]);
+      setCampaigns((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const filtered = filter === "all" ? campaigns : campaigns.filter((c) => c.status === filter);
+  const counts = {
+    all: campaigns.length,
+    pending: campaigns.filter((c) => c.status === "pending").length,
+    approved: campaigns.filter((c) => c.status === "approved").length,
+    rejected: campaigns.filter((c) => c.status === "rejected").length,
+  };
+
+  if (isLoading || !user) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
+        <Loader2 size={36} style={{ animation: "spin 1s linear infinite", color: "var(--primary)" }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div className="gradient-bg-main" style={{ minHeight: "calc(100vh - var(--nav-height))", padding: "3rem 1.5rem" }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+
+        {/* Header */}
+        <div className="animate-slide-down" style={{ marginBottom: "2.5rem" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(79,70,229,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <FileText size={20} color="#4f46e5" />
+                </div>
+                <h1 className="page-title" style={{ margin: 0 }}>Campaign Review</h1>
+              </div>
+              <p style={{ color: "#64748b", fontSize: "0.95rem" }}>Approve or reject campaigns submitted by users.</p>
+            </div>
+            <button onClick={fetchCampaigns} className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="animate-slide-down" style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.85rem 1rem", borderRadius: "var(--radius-md)", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.2)", color: "#dc2626", fontSize: "0.85rem", marginBottom: "1.5rem" }}>
+            <AlertCircle size={16} />{error}
+          </div>
+        )}
+
+        {/* Filter pills */}
+        <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>
+          {(["all", "pending", "approved", "rejected"] as const).map((f) => {
+            const cfg = f === "all" ? { color: "#4f46e5", bg: "rgba(79,70,229,0.1)", border: "rgba(79,70,229,0.3)" } : STATUS_CONFIG[f];
+            const active = filter === f;
+            return (
+              <button key={f} onClick={() => setFilter(f)} style={{ padding: "0.4rem 1rem", borderRadius: 20, border: `1px solid ${active ? cfg.border : "var(--border)"}`, background: active ? cfg.bg : "transparent", color: active ? cfg.color : "#64748b", fontWeight: active ? 700 : 500, fontSize: "0.82rem", cursor: "pointer", textTransform: "capitalize", transition: "all 0.15s" }}>
+                {f} ({counts[f]})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* List */}
+        {fetchLoading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: "4rem", gap: "0.75rem", color: "#64748b" }}>
+            <Loader2 size={24} style={{ animation: "spin 1s linear infinite" }} /> Loading campaigns…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="glass-card" style={{ padding: "4rem", textAlign: "center", color: "#64748b" }}>
+            <FileText size={40} style={{ marginBottom: "1rem", opacity: 0.3 }} />
+            <p>No {filter !== "all" ? filter : ""} campaigns found.</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {filtered.map((c) => {
+              const isExp = expanded === c.id;
+              return (
+                <div key={c.id} className="glass-card animate-slide-up" style={{ padding: 0, overflow: "hidden" }}>
+                  {/* Card header */}
+                  <div style={{ padding: "1.25rem 1.5rem", display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap", cursor: "pointer" }} onClick={() => setExpanded(isExp ? null : c.id)}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.35rem", flexWrap: "wrap" }}>
+                        <StatusBadge status={c.status} />
+                        <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                          {c.created_at ? new Date(c.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                        </span>
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {c.topic}
+                      </div>
+                      <div style={{ display: "flex", gap: "1rem", marginTop: "0.25rem", flexWrap: "wrap" }}>
+                        {c.user_name && <span style={{ fontSize: "0.78rem", color: "#64748b", display: "flex", alignItems: "center", gap: "0.3rem" }}><User size={12} />{c.user_name}</span>}
+                        {c.user_email && <span style={{ fontSize: "0.78rem", color: "#64748b" }}>{c.user_email}</span>}
+                        {c.target_language && <span style={{ fontSize: "0.78rem", color: "#64748b", display: "flex", alignItems: "center", gap: "0.3rem" }}><Globe size={12} />{c.target_language}</span>}
+                        <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>Tone: {c.tone}</span>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+                      {c.status !== "approved" && (
+                        <button className="btn" disabled={!!actionLoading} onClick={() => handleStatus(c.id, "approved")}
+                          style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", color: "#10b981", display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.9rem", fontSize: "0.82rem", fontWeight: 600 }}>
+                          {actionLoading === c.id + "approved" ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <CheckCircle size={14} />}
+                          Approve
+                        </button>
+                      )}
+                      {c.status !== "rejected" && (
+                        <button className="btn" disabled={!!actionLoading} onClick={() => handleStatus(c.id, "rejected")}
+                          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.9rem", fontSize: "0.82rem", fontWeight: 600 }}>
+                          {actionLoading === c.id + "rejected" ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <XCircle size={14} />}
+                          Reject
+                        </button>
+                      )}
+                      {c.status !== "pending" && (
+                        <button className="btn btn-secondary" disabled={!!actionLoading} onClick={() => handleStatus(c.id, "pending")}
+                          style={{ display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.9rem", fontSize: "0.82rem" }}>
+                          <Clock size={13} /> Reset
+                        </button>
+                      )}
+                    </div>
+                    {isExp ? <ChevronUp size={18} color="#94a3b8" /> : <ChevronDown size={18} color="#94a3b8" />}
+                  </div>
+
+                  {/* Expanded detail */}
+                  {isExp && (
+                    <div style={{ borderTop: "1px solid var(--border)", padding: "1.25rem 1.5rem", background: "rgba(0,0,0,0.015)" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                        <div>
+                          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.4rem" }}>Original Content</div>
+                          <div style={{ fontSize: "0.85rem", color: "var(--foreground)", lineHeight: 1.6, maxHeight: 140, overflow: "auto", background: "rgba(0,0,0,0.03)", padding: "0.75rem", borderRadius: 8 }}>
+                            {c.original_content}
+                          </div>
+                        </div>
+                        {c.translated_content && (
+                          <div>
+                            <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.4rem" }}>Translated ({c.target_language})</div>
+                            <div style={{ fontSize: "0.85rem", color: "var(--foreground)", lineHeight: 1.6, maxHeight: 140, overflow: "auto", background: "rgba(0,0,0,0.03)", padding: "0.75rem", borderRadius: 8 }}>
+                              {c.translated_content}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "0.78rem", fontWeight: 600, color: "#64748b", display: "block", marginBottom: "0.35rem" }}>Admin Note (optional)</label>
+                        <textarea rows={2} className="input" style={{ resize: "vertical", fontSize: "0.85rem" }}
+                          placeholder="Add a note for this decision…"
+                          value={noteMap[c.id] ?? c.admin_note ?? ""}
+                          onChange={(e) => setNoteMap((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                        />
+                      </div>
+                      {c.admin_note && <div style={{ marginTop: "0.5rem", fontSize: "0.8rem", color: "#64748b", fontStyle: "italic" }}>Last note: "{c.admin_note}"</div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

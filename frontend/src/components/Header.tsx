@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   BarChart3,
   BookOpen,
+  FileText,
   Globe,
   History,
   Home,
@@ -25,6 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 const adminNavLinks = [
   { href: "/", label: "Home", icon: Home },
   { href: "/admin", label: "Admin Panel", icon: Shield },
+  { href: "/admin/campaigns", label: "Campaign Review", icon: FileText },
   { href: "/admin/manager-tasks", label: "Manager Tasks", icon: Zap },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

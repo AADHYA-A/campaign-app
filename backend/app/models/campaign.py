@@ -24,3 +24,9 @@ class Campaign(Base):
     # Optional owner — NULL means the campaign was created anonymously
     user_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
+    # Admin approval status: pending | approved | rejected
+    status = Column(String(20), nullable=False, default="pending", server_default="pending")
+
+    # Admin review notes
+    admin_note = Column(Text, nullable=True)
+

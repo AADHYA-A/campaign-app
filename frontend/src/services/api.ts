@@ -376,7 +376,41 @@ export const adminDeleteUser = async (userId: string): Promise<void> => {
   await api.delete(`/admin/users/${userId}`);
 };
 
-// ── Milestone 3: Distribution & Analytics Endpoints ───────────────────────────
+// ── Admin Campaign Review ─────────────────────────────────────────────────────
+export interface AdminCampaign {
+  id: string;
+  topic: string;
+  tone: string;
+  original_content: string;
+  translated_content?: string | null;
+  target_language?: string | null;
+  sentiment_label?: string | null;
+  status: "pending" | "approved" | "rejected";
+  admin_note?: string | null;
+  user_id?: string | null;
+  user_email?: string | null;
+  user_name?: string | null;
+  created_at?: string | null;
+}
+
+export const adminGetCampaigns = async (): Promise<AdminCampaign[]> => {
+  const response = await api.get("/admin/campaigns");
+  return response.data;
+};
+
+export const adminUpdateCampaignStatus = async (
+  campaignId: string,
+  status: "approved" | "rejected" | "pending",
+  adminNote?: string
+): Promise<AdminCampaign> => {
+  const response = await api.patch(`/admin/campaigns/${campaignId}/status`, {
+    status,
+    admin_note: adminNote ?? null,
+  });
+  return response.data;
+};
+
+
 export const launchDistribution = async (
   data: LaunchDistributionRequest
 ): Promise<DistributionJob> => {
