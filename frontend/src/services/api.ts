@@ -142,6 +142,8 @@ export interface AdminUserUpdate {
   is_superuser?: boolean;
   full_name?: string;
   organization?: string;
+  department?: string;
+  manager_id?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
