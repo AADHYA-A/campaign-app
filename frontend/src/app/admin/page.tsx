@@ -84,10 +84,14 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{ role: string; is_active: boolean }>({
+  const [editValues, setEditValues] = useState<{ role: string; is_active: boolean; manager_id: string }>({
     role: "user",
     is_active: true,
+    manager_id: "",
   });
+
+  // Managers available to assign as someone's manager
+  const managers = users.filter((u) => u.role === "manager");
 
   // Redirect if not admin
   useEffect(() => {
@@ -155,6 +159,7 @@ export default function AdminPage() {
           is_active: true,
           is_superuser: false,
           is_verified: true,
+          manager_id: "2",
         },
         {
           id: "5",
@@ -167,6 +172,7 @@ export default function AdminPage() {
           is_active: true,
           is_superuser: false,
           is_verified: false,
+          manager_id: "3",
         },
       ];
       setUsers(fallbackUsers);
@@ -199,7 +205,11 @@ export default function AdminPage() {
 
   const startEdit = (u: AdminUser) => {
     setEditingId(u.id);
-    setEditValues({ role: u.role ?? "user", is_active: u.is_active });
+    setEditValues({
+      role: u.role ?? "user",
+      is_active: u.is_active,
+      manager_id: u.manager_id ?? "",
+    });
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -207,7 +217,11 @@ export default function AdminPage() {
   const saveEdit = async (userId: string) => {
     setSavingId(userId);
     try {
-      const updated = await adminUpdateUser(userId, editValues);
+      const updated = await adminUpdateUser(userId, {
+        role: editValues.role,
+        is_active: editValues.is_active,
+        manager_id: editValues.manager_id || null,
+      });
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...updated } : u)));
       setEditingId(null);
     } catch (e: unknown) {
@@ -322,7 +336,7 @@ export default function AdminPage() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["User", "Organisation", "Role", "Status", "Verified", "Actions"].map((h) => (
+                    {["User", "Organisation", "Role", "Manager", "Status", "Verified", "Actions"].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -412,6 +426,36 @@ export default function AdminPage() {
                             </select>
                           ) : (
                             <RoleBadge role={u.role} isSuperuser={u.is_superuser} />
+                          )}
+                        </td>
+
+                        {/* Manager — editable */}
+                        <td style={{ padding: "1rem 1.25rem" }}>
+                          {isEditing ? (
+                            <select
+                              className="input select"
+                              value={editValues.manager_id}
+                              onChange={(e) => setEditValues((v) => ({ ...v, manager_id: e.target.value }))}
+                              style={{ width: "auto", padding: "0.3rem 2rem 0.3rem 0.6rem", fontSize: "0.8rem" }}
+                              disabled={u.is_superuser || u.role === "admin"}
+                            >
+                              <option value="">— None —</option>
+                              {managers
+                                .filter((m) => m.id !== u.id)
+                                .map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.full_name || m.email}
+                                  </option>
+                                ))}
+                            </select>
+                          ) : (
+                            <span style={{ fontSize: "0.85rem", color: u.manager_id ? "var(--foreground)" : "#94a3b8" }}>
+                              {u.manager_id
+                                ? users.find((m) => m.id === u.manager_id)?.full_name ||
+                                  users.find((m) => m.id === u.manager_id)?.email ||
+                                  "Unknown"
+                                : "—"}
+                            </span>
                           )}
                         </td>
 
