@@ -80,6 +80,7 @@ _SEED_USERS = [
         "role": "user",
         "is_superuser": False,
         "is_verified": True,
+        "manager_email": "rajesh.kumar@campaigns.hub",
     },
     {
         "email": "sneha.reddy@campaigns.hub",
@@ -90,6 +91,7 @@ _SEED_USERS = [
         "role": "user",
         "is_superuser": False,
         "is_verified": True,
+        "manager_email": "priya.patel@campaigns.hub",
     },
 ]
 
@@ -137,6 +139,27 @@ async def _seed_users():
                         if updated:
                             session.add(existing)
                             print(f"[seed] Updated user: {seed['email']}")
+
+                # Second pass: link demo users to their manager via manager_email.
+                # Done after all seed users exist so both sides of the link are resolvable.
+                await session.flush()
+                for seed in _SEED_USERS:
+                    manager_email = seed.get("manager_email")
+                    if not manager_email:
+                        continue
+                    user_result = await session.execute(
+                        select(User).where(User.email == seed["email"])
+                    )
+                    seeded_user = user_result.scalar_one_or_none()
+                    manager_result = await session.execute(
+                        select(User).where(User.email == manager_email)
+                    )
+                    manager = manager_result.scalar_one_or_none()
+                    if seeded_user and manager and seeded_user.manager_id != str(manager.id):
+                        seeded_user.manager_id = str(manager.id)
+                        session.add(seeded_user)
+                        print(f"[seed] Linked {seeded_user.email} -> manager {manager.email}")
+
                 await session.commit()
                 print("[seed] User seeding complete.")
             except Exception as inner_e:
