@@ -135,45 +135,65 @@ class ResendEmailService:
         recipient_name: str,
         campaign_title: str,
         campaign_content: str,
+        translated_content: Optional[str] = None,
+        target_language: Optional[str] = None,
+        custom_subject: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Send a styled campaign email to a recipient."""
+        """Send a styled campaign awareness email to a recipient with multilingual support."""
+        translated_section = ""
+        if translated_content:
+            lang_label = target_language or "Translated Language"
+            translated_section = f"""
+            <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:20px;margin-bottom:24px;">
+              <p style="color:#34d399;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;font-weight:700;">🌐 Regional Content ({lang_label})</p>
+              <p style="color:#e2e8f0;font-size:15px;line-height:1.6;margin:0;">{translated_content}</p>
+            </div>
+            """
+
         html_body = f"""
         <!DOCTYPE html>
         <html lang="en">
         <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
         <body style="margin:0;padding:0;background:#0f172a;font-family:system-ui,-apple-system,sans-serif;">
-          <div style="max-width:600px;margin:40px auto;background:linear-gradient(135deg,#1e1b4b,#1e293b);border-radius:16px;overflow:hidden;border:1px solid rgba(99,102,241,0.2);">
+          <div style="max-width:600px;margin:40px auto;background:linear-gradient(135deg,#1e1b4b,#1e293b);border-radius:16px;overflow:hidden;border:1px solid rgba(99,102,241,0.25);box-shadow:0 20px 40px rgba(0,0,0,0.4);">
             <!-- Header -->
             <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:32px;text-align:center;">
+              <div style="display:inline-block;padding:4px 12px;background:rgba(255,255,255,0.18);border-radius:20px;color:#fff;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">📢 Campaign Awareness Broadcast</div>
               <h1 style="color:#fff;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.03em;">🌐 Campaign Hub</h1>
-              <p style="color:rgba(255,255,255,0.8);margin:8px 0 0;font-size:14px;">Multilingual Campaign Management</p>
+              <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Multilingual Communication & Awareness Engine</p>
             </div>
             <!-- Body -->
             <div style="padding:32px;">
-              <p style="color:#94a3b8;font-size:14px;margin:0 0 4px;">Dear</p>
+              <p style="color:#94a3b8;font-size:14px;margin:0 0 4px;">Hello</p>
               <h2 style="color:#e2e8f0;font-size:20px;margin:0 0 24px;font-weight:700;">{recipient_name}</h2>
-              <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:24px;margin-bottom:24px;">
-                <p style="color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">Campaign</p>
+              <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:24px;margin-bottom:20px;">
+                <p style="color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;font-weight:600;">Campaign Subject</p>
                 <h3 style="color:#c7d2fe;font-size:18px;margin:0 0 16px;font-weight:700;">{campaign_title}</h3>
                 <p style="color:#cbd5e1;font-size:15px;line-height:1.6;margin:0;">{campaign_content}</p>
               </div>
-              <p style="color:#64748b;font-size:13px;text-align:center;margin:0;">
-                This message was sent by Campaign Hub. To unsubscribe, contact your administrator.
-              </p>
+              {translated_section}
+              <div style="padding:16px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px dashed rgba(255,255,255,0.1);text-align:center;">
+                <p style="color:#64748b;font-size:12px;margin:0;">
+                  This is a real-time awareness update dispatched directly to your inbox.
+                </p>
+              </div>
             </div>
             <!-- Footer -->
-            <div style="background:rgba(0,0,0,0.2);padding:16px;text-align:center;">
-              <p style="color:#475569;font-size:12px;margin:0;">Powered by Campaign Hub × Resend</p>
+            <div style="background:rgba(0,0,0,0.3);padding:20px;text-align:center;border-top:1px solid rgba(255,255,255,0.05);">
+              <p style="color:#64748b;font-size:12px;margin:0 0 4px;">Powered by <strong>Campaign Hub</strong></p>
+              <p style="color:#475569;font-size:11px;margin:0;">Real-time Campaign Awareness Notification</p>
             </div>
           </div>
         </body>
         </html>
         """
+        subject = custom_subject or f"📢 Campaign Awareness: {campaign_title}"
         return await self.send(
             to=to,
-            subject=f"📢 {campaign_title}",
+            subject=subject,
             html_body=html_body,
         )
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -350,6 +370,9 @@ class NotificationService:
         campaign_content: str,
         channels: list[str],
         callmebot_apikey: Optional[str] = None,
+        translated_content: Optional[str] = None,
+        target_language: Optional[str] = None,
+        custom_subject: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Send campaign notifications across selected channels for a single recipient.
@@ -363,6 +386,9 @@ class NotificationService:
                 recipient_name=recipient_name,
                 campaign_title=campaign_title,
                 campaign_content=campaign_content,
+                translated_content=translated_content,
+                target_language=target_language,
+                custom_subject=custom_subject,
             )
 
         if "whatsapp" in channels and phone:

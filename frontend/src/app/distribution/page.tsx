@@ -239,111 +239,20 @@ export default function DistributionPage() {
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
 
-  // Module 3 Live Metrics (Matching slide benchmark metrics with dynamic fallback)
+  // Module 3 metrics are populated from the selected distribution job.
   const [deliveryMetrics, setDeliveryMetrics] = useState({
-    delivered: 9500,
-    deliveredPct: 95.0,
-    failed: 300,
-    failedPct: 3.0,
-    pending: 150,
-    pendingPct: 1.5,
-    retrying: 50,
-    retryingPct: 0.5,
-    openRate: 8500,
-    openRatePct: 85.0,
-    ctr: 3200,
-    ctrPct: 32.0,
-    responses: 1100,
-    responsesPct: 11.0,
-    participation: 700,
-    participationPct: 7.0,
+    delivered: 0, deliveredPct: 0, failed: 0, failedPct: 0, pending: 0, pendingPct: 0,
+    retrying: 0, retryingPct: 0, openRate: 0, openRatePct: 0, ctr: 0, ctrPct: 0,
+    responses: 0, responsesPct: 0, participation: 0, participationPct: 0,
   });
 
   // Module 4 State (Feedback & Sentiment)
-  const [feedbackList, setFeedbackList] = useState<AudienceFeedbackItem[]>([
-    {
-      id: "fb-1",
-      recipient_name: "Aarav Sharma",
-      channel: "whatsapp",
-      language: "hin",
-      feedback_text: "Received on WhatsApp. Very clear dengue prevention steps in Hindi! Shared with my residential colony group.",
-      sentiment: "positive",
-      sentiment_score: 0.96,
-      key_theme: "Clear & Informative",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "fb-2",
-      recipient_name: "Priya Patel",
-      channel: "sms",
-      language: "hin",
-      feedback_text: "Helpful SMS alert. The municipal helpline number worked immediately when I reported stagnant water.",
-      sentiment: "positive",
-      sentiment_score: 0.94,
-      key_theme: "Quick Response",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "fb-3",
-      recipient_name: "Rajesh Kumar",
-      channel: "email",
-      language: "hin",
-      feedback_text: "The flyer graphics in the email gave good guidance on symptom detection. Thank you.",
-      sentiment: "positive",
-      sentiment_score: 0.91,
-      key_theme: "Visual Quality",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "fb-4",
-      recipient_name: "Ananya Iyer",
-      channel: "whatsapp",
-      language: "tam",
-      feedback_text: "Received Tamil notification on WhatsApp. Easy to follow, appreciate the regional outreach.",
-      sentiment: "positive",
-      sentiment_score: 0.95,
-      key_theme: "Multilingual Reach",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "fb-5",
-      recipient_name: "Vikram Singh",
-      channel: "sms",
-      language: "hin",
-      feedback_text: "Got the SMS message. Please share the timing for the fogging drive in Ward 12.",
-      sentiment: "neutral",
-      sentiment_score: 0.65,
-      key_theme: "Schedule Query",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "fb-6",
-      recipient_name: "Kavita Joshi",
-      channel: "push",
-      language: "hin",
-      feedback_text: "Push notification showed up at 10 AM, but the advisory link took 3 seconds to open.",
-      sentiment: "neutral",
-      sentiment_score: 0.58,
-      key_theme: "App Performance",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "fb-7",
-      recipient_name: "Rohan Mehta",
-      channel: "email",
-      language: "hin",
-      feedback_text: "Please send these alerts once per month rather than daily so it doesn't clutter inbox.",
-      sentiment: "negative",
-      sentiment_score: 0.82,
-      key_theme: "Frequency Concern",
-      created_at: new Date().toISOString(),
-    },
-  ]);
+  const [feedbackList, setFeedbackList] = useState<AudienceFeedbackItem[]>([]);
 
   const [sentimentBreakdown, setSentimentBreakdown] = useState({
-    positive_pct: 65,
-    neutral_pct: 25,
-    negative_pct: 10,
+    positive_pct: 0,
+    neutral_pct: 0,
+    negative_pct: 0,
   });
 
   // Custom feedback simulation form
@@ -372,11 +281,12 @@ export default function DistributionPage() {
       if (list.length > 0 && !currentJob) {
         selectJob(list[0]);
       } else if (!currentJob) {
-        generateDefaultLogs();
+        setDeliveryLogs([]);
       }
     } catch (err) {
-      console.warn("Backend not active, running with interactive client simulation:", err);
-      generateDefaultLogs();
+      setJobsList([]);
+      setDeliveryLogs([]);
+      showToast("Distribution data could not be loaded. Check the backend connection.");
     }
   };
 
@@ -422,22 +332,7 @@ export default function DistributionPage() {
       setNewRecipientEmail("");
       showToast(`Added ${created.name} to your recipients list.`);
     } catch (err) {
-      // Offline / no-backend fallback so the form still works in the UI
-      const fallback: Recipient = {
-        id: `local-${Date.now()}`,
-        name: newRecipientName.trim(),
-        phone_number: newRecipientPhone.trim() || null,
-        email: newRecipientEmail.trim() || null,
-        language: broadcastLanguage,
-        tags: [],
-        created_at: new Date().toISOString(),
-      };
-      setRecipients((prev) => [fallback, ...prev]);
-      setSelectedRecipientIds((prev) => [fallback.id, ...prev]);
-      setNewRecipientName("");
-      setNewRecipientPhone("");
-      setNewRecipientEmail("");
-      showToast(`Added ${fallback.name} to your recipients list.`);
+      setRecipientError("Could not save this recipient. Please check the backend connection and try again.");
     } finally {
       setIsAddingRecipient(false);
     }
@@ -446,12 +341,11 @@ export default function DistributionPage() {
   const handleDeleteRecipient = async (id: string) => {
     setRecipients((prev) => prev.filter((r) => r.id !== id));
     setSelectedRecipientIds((prev) => prev.filter((rid) => rid !== id));
-    if (!id.startsWith("local-")) {
-      try {
-        await deleteRecipient(id);
-      } catch (err) {
-        console.warn("Could not delete recipient from server:", err);
-      }
+    try {
+      await deleteRecipient(id);
+    } catch (err) {
+      await loadRecipients();
+      showToast("Could not delete recipient. The latest server data has been restored.");
     }
   };
 
@@ -569,29 +463,7 @@ export default function DistributionPage() {
       setTestResult(res);
       showToast(`Channel "${res.channel_name}" connected successfully! Ping latency: ${res.latency_ms}ms.`);
     } catch (err) {
-      // High-fidelity fallback test simulation
-      const ch = channels.find((c) => c.id === channelId) || channels[0];
-      const mockResult: ChannelTestResult = {
-        channel: channelId,
-        channel_name: ch.name,
-        provider: ch.provider,
-        status: "connected",
-        http_status: 200,
-        latency_ms: ch.latencyMs + Math.floor(Math.random() * 20 - 10),
-        target:
-          channelId === "email"
-            ? "health.officer@delhi.gov.in"
-            : channelId in { sms: 1, whatsapp: 1 }
-            ? "+91 98765 43210 (Test SIM)"
-            : channelId === "push"
-            ? "fcm_token_device_live_test"
-            : "ws://stream.campaigns.gov.in/live",
-        message_id: `msg_test_${Math.random().toString(36).substring(2, 10)}`,
-        verified_at: new Date().toISOString(),
-        message: `Verified connection to ${ch.provider}. Gateway handshake: 200 OK.`,
-      };
-      setTestResult(mockResult);
-      showToast(`Channel "${ch.name}" tested successfully! (${mockResult.latency_ms}ms)`);
+      showToast("Channel test failed. Verify that the server and channel configuration are available.");
     } finally {
       setIsTestingChannel(null);
     }
@@ -649,51 +521,7 @@ export default function DistributionPage() {
       showToast(`Campaign "${campaignName}" successfully scheduled and dispatched!`);
       setActiveModule(3); // Navigate to Module 3: Delivery Tracking
     } catch (err) {
-      // Simulate live launch in UI
-      const mockJob: DistributionJob = {
-        id: `job_${Date.now()}`,
-        title: campaignName,
-        content: campaignContent,
-        channels: scheduledChannels,
-        language: broadcastLanguage,
-        schedule_type: "scheduled",
-        scheduled_at: `${campaignDate}T${campaignTime}`,
-        recurring_frequency: frequency.toLowerCase(),
-        status: "completed",
-        total_recipients: effectiveAudienceSize,
-        sent_count: effectiveAudienceSize,
-        delivered_count: Math.round(effectiveAudienceSize * 0.95),
-        failed_count: Math.round(effectiveAudienceSize * 0.03),
-        retrying_count: Math.round(effectiveAudienceSize * 0.005),
-        pending_count: Math.round(effectiveAudienceSize * 0.015),
-        open_count: Math.round(effectiveAudienceSize * 0.85),
-        click_count: Math.round(effectiveAudienceSize * 0.32),
-        response_count: Math.round(effectiveAudienceSize * 0.11),
-        created_at: new Date().toISOString(),
-      };
-      setCurrentJob(mockJob);
-      setJobsList([mockJob, ...jobsList]);
-      setDeliveryMetrics({
-        delivered: mockJob.delivered_count,
-        deliveredPct: 95.0,
-        failed: mockJob.failed_count,
-        failedPct: 3.0,
-        pending: mockJob.pending_count,
-        pendingPct: 1.5,
-        retrying: mockJob.retrying_count,
-        retryingPct: 0.5,
-        openRate: mockJob.open_count,
-        openRatePct: 85.0,
-        ctr: mockJob.click_count,
-        ctrPct: 32.0,
-        responses: mockJob.response_count,
-        responsesPct: 11.0,
-        participation: Math.round(mockJob.response_count * 0.64),
-        participationPct: 7.0,
-      });
-      generateDefaultLogs();
-      showToast(`Campaign "${campaignName}" scheduled across ${scheduledChannels.length} channels!`);
-      setActiveModule(3);
+      showToast("Campaign was not scheduled. Check the backend connection and try again.");
     } finally {
       setIsLaunching(false);
     }
@@ -710,41 +538,10 @@ export default function DistributionPage() {
         await selectJob(currentJob);
         await loadJobs();
       } else {
-        throw new Error("Local simulation");
+        throw new Error("Select a server-backed distribution before retrying messages.");
       }
     } catch (err) {
-      // Local retry simulation
-      setTimeout(() => {
-        setDeliveryLogs((prev) =>
-          prev.map((log) =>
-            log.status === "failed" || log.status === "retrying"
-              ? {
-                  ...log,
-                  status: "delivered",
-                  failure_reason: "Recovered via automated gateway re-routing (Attempt 3/3)",
-                  retry_count: log.retry_count + 1,
-                  latency_ms: log.latency_ms + 45,
-                  is_opened: true,
-                  delivered_at: new Date().toISOString(),
-                }
-              : log
-          )
-        );
-        const recovered = deliveryMetrics.failed + deliveryMetrics.retrying;
-        setDeliveryMetrics((prev) => ({
-          ...prev,
-          delivered: prev.delivered + recovered,
-          deliveredPct: 98.5,
-          failed: 0,
-          failedPct: 0.0,
-          retrying: 0,
-          retryingPct: 0.0,
-        }));
-        setRetryMessage(`Successfully recovered and delivered ${recovered} failed messages across all carriers.`);
-        showToast("All failed messages retried & delivered successfully!");
-        setIsRetrying(false);
-      }, 700);
-      return;
+      setRetryMessage(err instanceof Error ? err.message : "Could not retry the failed messages.");
     }
     setIsRetrying(false);
   };
@@ -755,94 +552,30 @@ export default function DistributionPage() {
     if (!fbText.trim()) return;
     setIsSubmittingFb(true);
 
-    const name = fbName.trim() || "Audience Respondent";
-    const text = fbText.trim();
-
-    // AI/NLP Sentiment Classification heuristic
-    const lower = text.toLowerCase();
-    let sentiment: "positive" | "neutral" | "negative" = "neutral";
-    let score = 0.75;
-    let theme = "General Feedback";
-
-    if (
-      lower.includes("good") ||
-      lower.includes("great") ||
-      lower.includes("helpful") ||
-      lower.includes("clear") ||
-      lower.includes("thank") ||
-      lower.includes("excellent") ||
-      lower.includes("सुविधा") ||
-      lower.includes("धन्यवाद") ||
-      lower.includes("मदद") ||
-      lower.includes("सराहनीय") ||
-      lower.includes("उपयोगी")
-    ) {
-      sentiment = "positive";
-      score = 0.94;
-      theme = "Clear & Helpful";
-    } else if (
-      lower.includes("bad") ||
-      lower.includes("stop") ||
-      lower.includes("reduce") ||
-      lower.includes("spam") ||
-      lower.includes("problem") ||
-      lower.includes("fail") ||
-      lower.includes("गलत") ||
-      lower.includes("शिकायत") ||
-      lower.includes("देरी")
-    ) {
-      sentiment = "negative";
-      score = 0.88;
-      theme = "Service Grievance";
-    } else {
-      sentiment = "neutral";
-      score = 0.68;
-      theme = "Inquiry / Suggestion";
+    if (!currentJob) {
+      showToast("Select a distribution before recording feedback.");
+      setIsSubmittingFb(false);
+      return;
     }
-
-    const newFb: AudienceFeedbackItem = {
-      id: `fb-${Date.now()}`,
-      recipient_name: name,
-      channel: fbChannel,
-      language: fbLang,
-      feedback_text: text,
-      sentiment: sentiment,
-      sentiment_score: score,
-      key_theme: theme,
-      created_at: new Date().toISOString(),
-    };
 
     try {
-      if (currentJob) {
-        await submitAudienceFeedback(currentJob.id, {
-          recipient_name: name,
-          channel: fbChannel,
-          language: fbLang,
-          feedback_text: text,
-        });
-      }
+      const feedback = await submitAudienceFeedback(currentJob.id, {
+        recipient_name: fbName.trim() || "Audience Respondent",
+        channel: fbChannel,
+        language: fbLang,
+        feedback_text: fbText.trim(),
+      });
+      setFeedbackList((previous) => [feedback, ...previous]);
+      const summary = await getDistributionFeedback(currentJob.id);
+      setSentimentBreakdown(summary.sentiment_breakdown);
+      setFbText("");
+      setFbName("");
+      showToast(`Feedback recorded as ${feedback.sentiment.toUpperCase()}.`);
     } catch (err) {
-      console.warn("Recorded locally", err);
+      showToast("Feedback could not be recorded. Please try again.");
+    } finally {
+      setIsSubmittingFb(false);
     }
-
-    setFeedbackList([newFb, ...feedbackList]);
-    setFbText("");
-    setFbName("");
-    setIsSubmittingFb(false);
-
-    // Recalculate sentiment breakdown
-    const total = feedbackList.length + 1;
-    const posCount = feedbackList.filter((f) => f.sentiment === "positive").length + (sentiment === "positive" ? 1 : 0);
-    const neuCount = feedbackList.filter((f) => f.sentiment === "neutral").length + (sentiment === "neutral" ? 1 : 0);
-    const negCount = feedbackList.filter((f) => f.sentiment === "negative").length + (sentiment === "negative" ? 1 : 0);
-
-    setSentimentBreakdown({
-      positive_pct: Math.round((posCount / total) * 100),
-      neutral_pct: Math.round((neuCount / total) * 100),
-      negative_pct: Math.round((negCount / total) * 100),
-    });
-
-    showToast(`Feedback recorded and classified as ${sentiment.toUpperCase()} with theme: ${theme}`);
   };
 
   // Preset Dengue Awareness Campaign Scenario (Matches requirements from Slides 1 & 2)

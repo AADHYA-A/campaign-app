@@ -2,11 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import {
   adminGetCampaigns,
   adminUpdateCampaignStatus,
+  sendCampaignBlast,
   AdminCampaign,
+  CampaignBlastResponse,
 } from "@/services/api";
 import {
   CheckCircle,
@@ -20,6 +23,12 @@ import {
   FileText,
   Loader2,
   AlertCircle,
+  Mail,
+  Send,
+  Sparkles,
+  ExternalLink,
+  Check,
+  Info,
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -49,6 +58,14 @@ export default function AdminCampaignsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [blastLoading, setBlastLoading] = useState<string | null>(null);
+  const [blastFeedback, setBlastFeedback] = useState<{
+    campaignId: string;
+    success: boolean;
+    simulated: boolean;
+    message: string;
+    details?: CampaignBlastResponse;
+  } | null>(null);
   const [noteMap, setNoteMap] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
 
@@ -133,6 +150,43 @@ export default function AdminCampaignsPage() {
     }
   };
 
+  const handleSendEmailBlast = async (c: AdminCampaign) => {
+    setBlastLoading(c.id);
+    setBlastFeedback(null);
+    try {
+      const response = await sendCampaignBlast({
+        campaign_title: c.topic,
+        campaign_content: c.original_content,
+        target_language: c.target_language || "Hindi",
+        translated_content: c.translated_content,
+        recipients: ["aadhyababu@gmail.com", "aadhyaa0404@gmail.com"],
+        recipient_names: {
+          "aadhyababu@gmail.com": "Aadhya Babu",
+          "aadhyaa0404@gmail.com": "Aadhya",
+        },
+      });
+
+      setBlastFeedback({
+        campaignId: c.id,
+        success: response.success || response.simulated,
+        simulated: response.simulated,
+        message: response.simulated
+          ? "Awareness Email simulated (Set RESEND_API_KEY in backend/.env for live delivery)."
+          : "Awareness Email dispatched in real-time to aadhyababu@gmail.com & aadhyaa0404@gmail.com!",
+        details: response,
+      });
+    } catch (err: any) {
+      setBlastFeedback({
+        campaignId: c.id,
+        success: false,
+        simulated: false,
+        message: err?.response?.data?.detail || err?.message || "Failed to dispatch campaign email.",
+      });
+    } finally {
+      setBlastLoading(null);
+    }
+  };
+
   const filtered = filter === "all" ? campaigns : campaigns.filter((c) => c.status === filter);
   const counts = {
     all: campaigns.length,
@@ -156,22 +210,82 @@ export default function AdminCampaignsPage() {
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
 
         {/* Header */}
-        <div className="animate-slide-down" style={{ marginBottom: "2.5rem" }}>
+        <div className="animate-slide-down" style={{ marginBottom: "2rem" }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.5rem" }}>
                 <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(79,70,229,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <FileText size={20} color="#4f46e5" />
                 </div>
-                <h1 className="page-title" style={{ margin: 0 }}>Campaign Review</h1>
+                <h1 className="page-title" style={{ margin: 0 }}>Campaign Review & Awareness Dispatch</h1>
               </div>
-              <p style={{ color: "#64748b", fontSize: "0.95rem" }}>Approve or reject campaigns submitted by users.</p>
+              <p style={{ color: "#64748b", fontSize: "0.95rem" }}>
+                Review campaigns and broadcast real-time awareness emails to <code style={{ background: "rgba(79,70,229,0.1)", color: "#4f46e5", padding: "2px 6px", borderRadius: 4 }}>aadhyababu@gmail.com</code> &amp; <code style={{ background: "rgba(79,70,229,0.1)", color: "#4f46e5", padding: "2px 6px", borderRadius: 4 }}>aadhyaa0404@gmail.com</code>.
+              </p>
             </div>
-            <button onClick={fetchCampaigns} className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <RefreshCw size={15} /> Refresh
-            </button>
+            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+              <Link href="/admin/email-blast" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.5rem 1rem", fontSize: "0.85rem", textDecoration: "none" }}>
+                <Sparkles size={15} /> Custom Email Blast
+              </Link>
+              <button onClick={fetchCampaigns} className="btn btn-secondary" style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <RefreshCw size={15} /> Refresh
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Global Blast Feedback Banner */}
+        {blastFeedback && (
+          <div className="animate-slide-down" style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.6rem",
+            padding: "1rem 1.25rem",
+            borderRadius: "var(--radius-md)",
+            background: blastFeedback.success
+              ? blastFeedback.simulated ? "rgba(245,158,11,0.08)" : "rgba(16,185,129,0.08)"
+              : "rgba(220,38,38,0.08)",
+            border: `1px solid ${blastFeedback.success
+              ? blastFeedback.simulated ? "rgba(245,158,11,0.3)" : "rgba(16,185,129,0.3)"
+              : "rgba(220,38,38,0.3)"}`,
+            color: blastFeedback.success
+              ? blastFeedback.simulated ? "#d97706" : "#059669"
+              : "#dc2626",
+            fontSize: "0.88rem",
+            marginBottom: "1.5rem"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 700 }}>
+                {blastFeedback.success ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                {blastFeedback.message}
+              </div>
+              <button onClick={() => setBlastFeedback(null)} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: "0.8rem", textDecoration: "underline" }}>
+                Dismiss
+              </button>
+            </div>
+
+            {blastFeedback.details?.results && (
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                {blastFeedback.details.results.map((r) => (
+                  <div key={r.email} style={{
+                    fontSize: "0.78rem",
+                    padding: "0.3rem 0.6rem",
+                    borderRadius: 6,
+                    background: "rgba(0,0,0,0.04)",
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem"
+                  }}>
+                    <Mail size={12} />
+                    <strong>{r.email}</strong>: {r.result.success ? "✅ Sent" : r.result.simulated ? "⚡ Simulated" : "❌ " + (r.result.error || "Failed")}
+                    {r.result.message_id && <span style={{ opacity: 0.6 }}>({r.result.message_id})</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -179,6 +293,30 @@ export default function AdminCampaignsPage() {
             <AlertCircle size={16} />{error}
           </div>
         )}
+
+        {/* Quick info card about recipients */}
+        <div style={{
+          background: "linear-gradient(135deg, rgba(79,70,229,0.06), rgba(124,58,237,0.06))",
+          border: "1px solid rgba(79,70,229,0.18)",
+          borderRadius: "var(--radius-md)",
+          padding: "0.9rem 1.25rem",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "0.8rem",
+          marginBottom: "1.5rem"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <Mail size={18} color="#4f46e5" />
+            <div style={{ fontSize: "0.85rem", color: "var(--foreground)" }}>
+              Target Real-Time Awareness Inboxes: <strong>aadhyababu@gmail.com</strong> and <strong>aadhyaa0404@gmail.com</strong>
+            </div>
+          </div>
+          <span style={{ fontSize: "0.75rem", color: "#64748b", background: "rgba(255,255,255,0.4)", padding: "0.2rem 0.6rem", borderRadius: 12 }}>
+            ⚡ 1-Click Real-Time Delivery
+          </span>
+        </div>
 
         {/* Filter pills */}
         <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>
@@ -207,18 +345,19 @@ export default function AdminCampaignsPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {filtered.map((c) => {
               const isExp = expanded === c.id;
+              const isBlasting = blastLoading === c.id;
               return (
                 <div key={c.id} className="glass-card animate-slide-up" style={{ padding: 0, overflow: "hidden" }}>
                   {/* Card header */}
                   <div style={{ padding: "1.25rem 1.5rem", display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap", cursor: "pointer" }} onClick={() => setExpanded(isExp ? null : c.id)}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ flex: 1, minWidth: 260 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.35rem", flexWrap: "wrap" }}>
                         <StatusBadge status={c.status} />
                         <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
                           {c.created_at ? new Date(c.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : ""}
                         </span>
                       </div>
-                      <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ fontWeight: 700, fontSize: "1.05rem", color: "var(--foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {c.topic}
                       </div>
                       <div style={{ display: "flex", gap: "1rem", marginTop: "0.25rem", flexWrap: "wrap" }}>
@@ -230,24 +369,52 @@ export default function AdminCampaignsPage() {
                     </div>
 
                     {/* Action buttons */}
-                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
+                      {/* Send Awareness Email Button */}
+                      <button
+                        className="btn"
+                        disabled={isBlasting}
+                        onClick={() => handleSendEmailBlast(c)}
+                        title="Send real-time campaign email to aadhyababu@gmail.com & aadhyaa0404@gmail.com"
+                        style={{
+                          background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          padding: "0.45rem 0.95rem",
+                          fontSize: "0.82rem",
+                          fontWeight: 700,
+                          borderRadius: 8,
+                          border: "none",
+                          boxShadow: "0 2px 8px rgba(79,70,229,0.3)",
+                        }}
+                      >
+                        {isBlasting ? (
+                          <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+                        ) : (
+                          <Mail size={14} />
+                        )}
+                        {isBlasting ? "Sending Email…" : "Send Email"}
+                      </button>
+
                       {c.status !== "approved" && (
                         <button className="btn" disabled={!!actionLoading} onClick={() => handleStatus(c.id, "approved")}
-                          style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", color: "#10b981", display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.9rem", fontSize: "0.82rem", fontWeight: 600 }}>
+                          style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", color: "#10b981", display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.85rem", fontSize: "0.82rem", fontWeight: 600 }}>
                           {actionLoading === c.id + "approved" ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <CheckCircle size={14} />}
                           Approve
                         </button>
                       )}
                       {c.status !== "rejected" && (
                         <button className="btn" disabled={!!actionLoading} onClick={() => handleStatus(c.id, "rejected")}
-                          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.9rem", fontSize: "0.82rem", fontWeight: 600 }}>
+                          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#ef4444", display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.85rem", fontSize: "0.82rem", fontWeight: 600 }}>
                           {actionLoading === c.id + "rejected" ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : <XCircle size={14} />}
                           Reject
                         </button>
                       )}
                       {c.status !== "pending" && (
                         <button className="btn btn-secondary" disabled={!!actionLoading} onClick={() => handleStatus(c.id, "pending")}
-                          style={{ display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.9rem", fontSize: "0.82rem" }}>
+                          style={{ display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0.85rem", fontSize: "0.82rem" }}>
                           <Clock size={13} /> Reset
                         </button>
                       )}
@@ -274,6 +441,45 @@ export default function AdminCampaignsPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Recipient preview badge */}
+                      <div style={{
+                        background: "rgba(79,70,229,0.04)",
+                        border: "1px solid rgba(79,70,229,0.15)",
+                        borderRadius: 8,
+                        padding: "0.75rem 1rem",
+                        marginBottom: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "0.5rem"
+                      }}>
+                        <div style={{ fontSize: "0.8rem", color: "var(--foreground)" }}>
+                          🚀 <strong>Ready to send awareness update:</strong> Delivering to <code>aadhyababu@gmail.com</code> &amp; <code>aadhyaa0404@gmail.com</code>
+                        </div>
+                        <button
+                          className="btn"
+                          disabled={isBlasting}
+                          onClick={() => handleSendEmailBlast(c)}
+                          style={{
+                            background: "#4f46e5",
+                            color: "#fff",
+                            padding: "0.35rem 0.8rem",
+                            fontSize: "0.78rem",
+                            fontWeight: 600,
+                            borderRadius: 6,
+                            border: "none",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.3rem"
+                          }}
+                        >
+                          {isBlasting ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={12} />}
+                          Dispatch Now
+                        </button>
+                      </div>
+
                       <div>
                         <label style={{ fontSize: "0.78rem", fontWeight: 600, color: "#64748b", display: "block", marginBottom: "0.35rem" }}>Admin Note (optional)</label>
                         <textarea rows={2} className="input" style={{ resize: "vertical", fontSize: "0.85rem" }}
@@ -294,4 +500,3 @@ export default function AdminCampaignsPage() {
     </div>
   );
 }
-

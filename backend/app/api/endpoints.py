@@ -162,6 +162,21 @@ class BulkNotifyRequest(BaseModel):
     channels: List[str] = Field(default=["email", "whatsapp"])
 
 
+class CampaignBlastRequest(BaseModel):
+    campaign_title: str
+    campaign_content: str
+    target_language: Optional[str] = "Hindi"
+    translated_content: Optional[str] = None
+    recipients: Optional[List[str]] = Field(
+        default=["aadhyababu@gmail.com", "aadhyaa0404@gmail.com"]
+    )
+    custom_subject: Optional[str] = None
+    recipient_names: Optional[Dict[str, str]] = Field(
+        default={"aadhyababu@gmail.com": "Aadhya Babu", "aadhyaa0404@gmail.com": "Aadhya"}
+    )
+
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Legacy campaign endpoint (kept for backward compatibility)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1186,6 +1201,63 @@ async def bulk_notify_recipients(
         "channels": req.channels,
         "results": results,
     }
+
+
+@router.post(
+    "/notify/campaign-blast",
+    tags=["notifications"],
+    summary="Real-time Campaign Awareness Email Blast to aadhyababu@gmail.com & aadhyaa0404@gmail.com",
+)
+async def send_campaign_awareness_blast(
+    req: CampaignBlastRequest,
+    current_user: Optional[User] = Depends(optional_current_user),
+):
+    """
+    Sends real-time campaign awareness email to specified recipients 
+    (defaults to aadhyababu@gmail.com and aadhyaa0404@gmail.com).
+    Uses the Resend API notification service with beautiful dark glassmorphism email styling.
+    """
+    target_recipients = req.recipients or ["aadhyababu@gmail.com", "aadhyaa0404@gmail.com"]
+    if not target_recipients:
+        raise HTTPException(status_code=400, detail="At least one recipient email must be provided.")
+
+    names_map = req.recipient_names or {}
+    results = []
+
+    for email_addr in target_recipients:
+        clean_email = email_addr.strip()
+        if not clean_email:
+            continue
+        recipient_name = names_map.get(clean_email) or clean_email.split("@")[0].capitalize()
+        
+        send_res = await notification_service.email.send_campaign_notification(
+            to=clean_email,
+            recipient_name=recipient_name,
+            campaign_title=req.campaign_title,
+            campaign_content=req.campaign_content,
+            translated_content=req.translated_content,
+            target_language=req.target_language,
+            custom_subject=req.custom_subject,
+        )
+        results.append({
+            "email": clean_email,
+            "recipient_name": recipient_name,
+            "result": send_res,
+        })
+
+    all_success = all(r["result"].get("success", False) for r in results)
+    is_simulated = any(r["result"].get("simulated", False) for r in results)
+
+    return {
+        "success": all_success,
+        "simulated": is_simulated,
+        "campaign_title": req.campaign_title,
+        "target_language": req.target_language,
+        "total_sent": len(results),
+        "results": results,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

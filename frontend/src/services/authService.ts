@@ -8,6 +8,10 @@ export interface UserProfile {
   avatar_url?: string | null;
   organization?: string | null;
   preferred_language?: string | null;
+  department?: string | null;
+  manager_id?: string | null;
+  /** "user" | "manager" | "admin" */
+  role?: string | null;
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;

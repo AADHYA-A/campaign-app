@@ -41,110 +41,18 @@ import {
 } from "lucide-react";
 import { getAnalyticsOverview, AnalyticsOverviewResponse } from "@/services/api";
 
-const defaultAnalyticsData: AnalyticsOverviewResponse = {
-  summary: {
-    total_campaigns: 14,
-    total_distributions: 8,
-    total_audience_reach: 10000,
-    total_delivered: 9520,
-    total_failed: 380,
-    total_retrying: 45,
-    total_pending: 100,
-    delivery_rate_pct: 95.2,
-    open_rate_pct: 72.0,
-    ctr_pct: 38.0,
-    response_rate_pct: 14.9,
-  },
-  sentiment_overview: {
-    positive_pct: 68.0,
-    neutral_pct: 22.0,
-    negative_pct: 10.0,
-    average_score: 0.84,
-    total_feedback_count: 1420,
-  },
-  hourly_trends: [
-    { time: "06:00", sent: 450, delivered: 435, opened: 210, clicked: 80 },
-    { time: "08:00", sent: 1200, delivered: 1160, opened: 820, clicked: 340 },
-    { time: "10:00", sent: 2800, delivered: 2690, opened: 2040, clicked: 890 },
-    { time: "12:00", sent: 2100, delivered: 2020, opened: 1540, clicked: 620 },
-    { time: "14:00", sent: 1600, delivered: 1530, opened: 1080, clicked: 410 },
-    { time: "16:00", sent: 2400, delivered: 2310, opened: 1750, clicked: 720 },
-    { time: "18:00", sent: 3100, delivered: 2980, opened: 2290, clicked: 960 },
-    { time: "20:00", sent: 1800, delivered: 1720, opened: 1210, clicked: 490 },
-  ],
-  channels: [
-    {
-      channel: "WhatsApp",
-      icon: "MessageCircle",
-      reach: 3850,
-      delivery_rate: 99.1,
-      open_rate: 94.8,
-      ctr: 51.6,
-      response_rate: 34.2,
-      status: "Optimal",
-      color: "#22c55e",
-    },
-    {
-      channel: "SMS Gateway",
-      icon: "Smartphone",
-      reach: 2900,
-      delivery_rate: 98.4,
-      open_rate: 91.5,
-      ctr: 43.8,
-      response_rate: 21.6,
-      status: "High Delivery",
-      color: "#10b981",
-    },
-    {
-      channel: "Email Broadcast",
-      icon: "Mail",
-      reach: 2400,
-      delivery_rate: 96.8,
-      open_rate: 67.4,
-      ctr: 31.8,
-      response_rate: 13.5,
-      status: "Active",
-      color: "#3b82f6",
-    },
-    {
-      channel: "Push Notification",
-      icon: "Bell",
-      reach: 1850,
-      delivery_rate: 93.9,
-      open_rate: 57.6,
-      ctr: 27.4,
-      response_rate: 7.8,
-      status: "Good",
-      color: "#f59e0b",
-    },
-    {
-      channel: "Web Broadcast",
-      icon: "Radio",
-      reach: 1200,
-      delivery_rate: 99.3,
-      open_rate: 87.5,
-      ctr: 39.5,
-      response_rate: 17.2,
-      status: "Live",
-      color: "#8b5cf6",
-    },
-  ],
-  languages: [
-    { code: "hin", language: "Hindi (हिंदी)", reach: 3840, delivery_rate: 98.2, open_rate: 78.4, sentiment_score: 0.88 },
-    { code: "tam", language: "Tamil (தமிழ்)", reach: 1620, delivery_rate: 97.6, open_rate: 74.2, sentiment_score: 0.84 },
-    { code: "tel", language: "Telugu (తెలుగు)", reach: 1480, delivery_rate: 98.0, open_rate: 76.1, sentiment_score: 0.86 },
-    { code: "ben", language: "Bengali (বাংলা)", reach: 1120, delivery_rate: 96.9, open_rate: 71.8, sentiment_score: 0.81 },
-    { code: "mar", language: "Marathi (मराठी)", reach: 950, delivery_rate: 97.4, open_rate: 73.5, sentiment_score: 0.85 },
-    { code: "guj", language: "Gujarati (ગુજરાતી)", reach: 680, delivery_rate: 98.1, open_rate: 75.0, sentiment_score: 0.87 },
-    { code: "kan", language: "Kannada (ಕನ್ನಡ)", reach: 540, delivery_rate: 97.0, open_rate: 72.4, sentiment_score: 0.83 },
-    { code: "mal", language: "Malayalam (മലയാളം)", reach: 430, delivery_rate: 96.5, open_rate: 70.8, sentiment_score: 0.82 },
-    { code: "pan", language: "Punjabi (ਪੰਜਾਬੀ)", reach: 380, delivery_rate: 97.2, open_rate: 74.6, sentiment_score: 0.85 },
-  ],
+const emptyAnalyticsData: AnalyticsOverviewResponse = {
+  summary: { total_campaigns: 0, total_distributions: 0, total_audience_reach: 0, total_delivered: 0, total_failed: 0, total_retrying: 0, total_pending: 0, delivery_rate_pct: 0, open_rate_pct: 0, ctr_pct: 0, response_rate_pct: 0 },
+  sentiment_overview: { positive_pct: 0, neutral_pct: 0, negative_pct: 0, average_score: 0, total_feedback_count: 0 },
+  hourly_trends: [],
+  channels: [],
+  languages: [],
 };
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState<AnalyticsOverviewResponse>(defaultAnalyticsData);
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<AnalyticsOverviewResponse>(emptyAnalyticsData);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [channelView, setChannelView] = useState<"reach" | "open_rate" | "ctr">("reach");
 
   useEffect(() => {
@@ -153,13 +61,14 @@ export default function AnalyticsPage() {
 
   const fetchAnalytics = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await getAnalyticsOverview();
       if (res && res.summary) {
         setData(res);
       }
     } catch (err) {
-      console.warn("Using baseline analytics dataset", err);
+      setError("Analytics could not be loaded. Check that the backend and database are available.");
     } finally {
       setLoading(false);
     }
@@ -242,6 +151,12 @@ export default function AnalyticsPage() {
             </Link>
           </div>
         </div>
+
+        {error && (
+          <div role="alert" className="card" style={{ padding: "1rem", borderColor: "rgba(220,38,38,0.35)", color: "#b91c1c" }}>
+            {error}
+          </div>
+        )}
 
         {/* Global Summary KPI Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>

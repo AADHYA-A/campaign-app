@@ -40,6 +40,22 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Derive the role string from known demo credentials or email patterns */
+function _deriveRole(email: string, password?: string): "admin" | "manager" | "user" {
+  const e = email.toLowerCase();
+  if (
+    e === "admin@campaigns.hub" ||
+    e.includes("admin") ||
+    password === "admin123"
+  ) return "admin";
+  if (
+    e === "manager@campaigns.hub" ||
+    e.includes("manager") ||
+    password === "manager123"
+  ) return "manager";
+  return "user";
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -132,18 +148,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errMsg.includes("ECONNREFUSED") ||
         errMsg.includes("not reachable")
       ) {
-        const isAdmin =
-          email.toLowerCase().includes("admin") ||
-          password === "admin123" ||
-          email === "admin@campaigns.hub";
+        const derivedRole = _deriveRole(email, password);
         const mockUser: UserProfile = {
           id: "user-" + Math.random().toString(36).substring(2, 9),
           email: email,
           full_name:
             email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-          organization: isAdmin ? "Campaigns Hub Admin" : "Marketing Team",
+          organization:
+            derivedRole === "admin" ? "Campaigns Hub — Admin" :
+            derivedRole === "manager" ? "Campaigns Hub — Operations" :
+            "Campaigns Hub — Marketing",
+          role: derivedRole,
           is_active: true,
-          is_superuser: isAdmin,
+          is_superuser: derivedRole === "admin",
           is_verified: true,
         };
         const mockToken = "mock_token_" + Date.now();
@@ -173,14 +190,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errMsg.includes("ECONNREFUSED") ||
         errMsg.includes("not reachable")
       ) {
-        const isAdmin = email.toLowerCase().includes("admin");
+        const derivedRole = _deriveRole(email, password);
         const mockUser: UserProfile = {
           id: "user-" + Math.random().toString(36).substring(2, 9),
           email: email,
           full_name: full_name || email.split("@")[0],
           organization: organization || "Marketing Team",
+          role: derivedRole,
           is_active: true,
-          is_superuser: isAdmin,
+          is_superuser: derivedRole === "admin",
           is_verified: true,
         };
         const mockToken = "mock_token_" + Date.now();

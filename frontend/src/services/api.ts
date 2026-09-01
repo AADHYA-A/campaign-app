@@ -516,4 +516,46 @@ export const getAnalyticsOverview = async (): Promise<AnalyticsOverviewResponse>
   return response.data;
 };
 
+// ── Campaign Awareness Email Blast ──────────────────────────────────────────
+export interface CampaignBlastRequest {
+  campaign_title: string;
+  campaign_content: string;
+  target_language?: string;
+  translated_content?: string | null;
+  recipients?: string[];
+  custom_subject?: string;
+  recipient_names?: Record<string, string>;
+}
+
+export interface CampaignBlastResultItem {
+  email: string;
+  recipient_name: string;
+  result: {
+    success: boolean;
+    message_id?: string;
+    simulated?: boolean;
+    warning?: string;
+    error?: string;
+    provider?: string;
+  };
+}
+
+export interface CampaignBlastResponse {
+  success: boolean;
+  simulated: boolean;
+  campaign_title: string;
+  target_language?: string;
+  total_sent: number;
+  results: CampaignBlastResultItem[];
+  timestamp: string;
+}
+
+export const sendCampaignBlast = async (
+  data: CampaignBlastRequest
+): Promise<CampaignBlastResponse> => {
+  const response = await api.post("/notify/campaign-blast", data);
+  return response.data;
+};
+
 export default api;
+
