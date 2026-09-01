@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     RESEND_FROM_EMAIL: str = "onboarding@resend.dev"
     RESEND_FROM_NAME: str = "Campaign Hub"
 
+    # ── Email — Direct SMTP / Gmail (Alternative Free Option) ───────────────
+    # For Gmail: use your email + a 16-character App Password from Google Account Security
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "Campaign Hub"
+    SMTP_TLS: bool = True
+
     # ── WhatsApp — CallMeBot (completely free, no Meta account needed) ────────
     # Each recipient activates by messaging +34 644 81 31 64 "I allow callmebot to send me messages"
     # Docs: https://www.callmebot.com/blog/free-api-whatsapp-messages/
@@ -34,6 +44,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
 
 import os
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode

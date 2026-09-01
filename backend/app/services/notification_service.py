@@ -25,7 +25,12 @@ Usage:
         apikey="123456",   # recipient's CallMeBot API key
     )
 """
+import asyncio
 import logging
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formataddr
 from typing import Optional, Dict, Any
 
 import httpx
@@ -36,16 +41,101 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Email — Resend
+# Email — Multi-Provider (Resend API + Direct SMTP/Gmail)
 # ─────────────────────────────────────────────────────────────────────────────
+
+class SmtpEmailService:
+    """
+    Sends transactional emails via direct SMTP (e.g. Gmail, Outlook, Amazon SES SMTP).
+    Zero external SaaS accounts required if using Gmail App Password.
+    """
+
+    def _sync_send(
+        self,
+        recipients: list[str],
+        subject: str,
+        html_body: str,
+        text_body: Optional[str] = None,
+        from_email: Optional[str] = None,
+        from_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        host = settings.SMTP_HOST or "smtp.gmail.com"
+        port = settings.SMTP_PORT or 587
+        user = settings.SMTP_USER
+        password = settings.SMTP_PASSWORD
+        sender_email = from_email or settings.SMTP_FROM_EMAIL or user
+        sender_name = from_name or settings.SMTP_FROM_NAME or "Campaign Hub"
+
+        if not user or not password:
+            return {
+                "success": False,
+                "error": "SMTP_USER or SMTP_PASSWORD not configured.",
+                "to": recipients,
+            }
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = formataddr((sender_name, sender_email))
+        msg["To"] = ", ".join(recipients)
+
+        if text_body:
+            msg.attach(MIMEText(text_body, "plain", "utf-8"))
+        if html_body:
+            msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        try:
+            with smtplib.SMTP(host, port, timeout=15.0) as server:
+                if settings.SMTP_TLS:
+                    server.starttls()
+                server.login(user, password)
+                server.send_message(msg)
+
+            logger.info(f"Email sent via SMTP to {recipients}")
+            return {
+                "success": True,
+                "provider": f"SMTP ({host})",
+                "to": recipients,
+                "subject": subject,
+            }
+        except Exception as exc:
+            logger.error(f"SMTP send failed: {exc}")
+            return {
+                "success": False,
+                "error": str(exc),
+                "to": recipients,
+            }
+
+    async def send(
+        self,
+        to: str | list[str],
+        subject: str,
+        html_body: str,
+        text_body: Optional[str] = None,
+        from_email: Optional[str] = None,
+        from_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        recipients = [to] if isinstance(to, str) else to
+        return await asyncio.to_thread(
+            self._sync_send,
+            recipients=recipients,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            from_email=from_email,
+            from_name=from_name,
+        )
+
 
 class ResendEmailService:
     """
-    Sends transactional emails via Resend's REST API (free tier).
+    Sends transactional emails via Resend's REST API or Direct SMTP.
     Docs: https://resend.com/docs/api-reference/emails/send-email
     """
 
     RESEND_API_URL = "https://api.resend.com/emails"
+
+    def __init__(self):
+        self.smtp = SmtpEmailService()
 
     async def send(
         self,
@@ -57,30 +147,40 @@ class ResendEmailService:
         from_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Send an email via Resend.
-
-        Returns a dict with keys: success (bool), message_id, error (if any).
-        Gracefully degrades — returns a warning dict if RESEND_API_KEY is not set.
+        Send an email via Resend API (if configured) or Direct SMTP / Gmail (if configured).
+        Gracefully degrades with informative warning if neither is set.
         """
+        recipients = [to] if isinstance(to, str) else to
+
+        # 1. Prefer Direct SMTP / Gmail if credentials provided
+        if settings.SMTP_USER and settings.SMTP_PASSWORD and not settings.SMTP_PASSWORD.startswith("your_"):
+            return await self.smtp.send(
+                to=recipients,
+                subject=subject,
+                html_body=html_body,
+                text_body=text_body,
+                from_email=from_email,
+                from_name=from_name,
+            )
+
+        # 2. Check Resend API
         api_key = settings.RESEND_API_KEY
         if not api_key or api_key.startswith("re_your_"):
             logger.warning(
-                "RESEND_API_KEY not configured. Email not sent. "
-                "Sign up free at https://resend.com to enable real email delivery."
+                "Neither RESEND_API_KEY nor SMTP credentials configured. Email not sent. "
+                "Configure RESEND_API_KEY or SMTP_USER/SMTP_PASSWORD in backend/.env."
             )
             return {
                 "success": False,
                 "simulated": True,
-                "warning": "RESEND_API_KEY not set — email delivery is simulated.",
-                "to": to,
+                "warning": "Email credentials not set — email delivery is simulated. Set RESEND_API_KEY or SMTP_USER/SMTP_PASSWORD in backend/.env.",
+                "to": recipients,
                 "subject": subject,
             }
 
         from_email = from_email or settings.RESEND_FROM_EMAIL
         from_name = from_name or settings.RESEND_FROM_NAME
         from_field = f"{from_name} <{from_email}>" if from_name else from_email
-
-        recipients = [to] if isinstance(to, str) else to
 
         payload: Dict[str, Any] = {
             "from": from_field,
@@ -128,6 +228,7 @@ class ResendEmailService:
                 "error": f"Network error: {exc}",
                 "to": recipients,
             }
+
 
     async def send_campaign_notification(
         self,
